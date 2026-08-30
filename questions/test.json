@@ -1,0 +1,371 @@
+[
+  {
+    "id": "test_01_code",
+    "type": "code",
+    "content": "Complete the Python function to return the sum of all even numbers in a given list :",
+    "answer": "def sum_evens(numbers):\n    return sum(n for n in numbers if n % 2 == 0)",
+    "explanation": "Generator expression filters even numbers (n % 2 == 0) and sum() computes their total.",
+    "code_language": "python",
+    "tags": [
+      "tech"
+    ],
+    "difficulty": "hard",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.5,
+      "repetitions": 0,
+      "next_review": "2026-08-07T18:30:00.000Z",
+      "last_reviewed": null,
+      "review_count": 0
+    },
+    "created_at": "2026-08-08T17:31:41.285Z",
+    "updated_at": "2026-08-08T18:46:04.480Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_02_tf",
+    "type": "tf",
+    "content": "HTTP/2 allows multiplexing multiple request and response messages over a single TCP connection.",
+    "answer": "true",
+    "explanation": "HTTP/2 introduced binary framing and streams, enabling full multiplexing over a single TCP connection.",
+    "tags": [
+      "tech",
+      "networking"
+    ],
+    "difficulty": "easy",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.6,
+      "repetitions": 1,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:10:20.604Z",
+      "review_count": 1
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:10:20.604Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_03_mcq",
+    "type": "mcq",
+    "content": "Which SQL command is used to permanently delete a database table and all of its data?",
+    "answer": "opt-2",
+    "explanation": "DROP TABLE deletes the table definition and all its rows permanently from the database schema.",
+    "options": [
+      {
+        "id": "opt-1",
+        "content": "REMOVE TABLE",
+        "is_correct": false
+      },
+      {
+        "id": "opt-2",
+        "content": "DROP TABLE",
+        "is_correct": true
+      },
+      {
+        "id": "opt-3",
+        "content": "DELETE TABLE",
+        "is_correct": false
+      },
+      {
+        "id": "opt-4",
+        "content": "CLEAR TABLE",
+        "is_correct": false
+      }
+    ],
+    "tags": [
+      "tech",
+      "databases"
+    ],
+    "difficulty": "easy",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:10:03.153Z",
+      "review_count": 2
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:10:15.384Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_04_multi",
+    "type": "multi",
+    "content": "Which of the following are primitive data types in JavaScript? (Select all that apply)",
+    "answer": "opt-1,opt-3,opt-4",
+    "explanation": "String, Number, and Symbol are primitives in JavaScript. Array and Object are reference types.",
+    "options": [
+      {
+        "id": "opt-1",
+        "content": "String",
+        "is_correct": true
+      },
+      {
+        "id": "opt-2",
+        "content": "Array",
+        "is_correct": false
+      },
+      {
+        "id": "opt-3",
+        "content": "Number",
+        "is_correct": true
+      },
+      {
+        "id": "opt-4",
+        "content": "Symbol",
+        "is_correct": true
+      }
+    ],
+    "tags": [
+      "tech",
+      "javascript"
+    ],
+    "difficulty": "medium",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:09:42.629Z",
+      "review_count": 3
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:10:12.300Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_05_typing",
+    "type": "typing",
+    "content": "What Git command is used to save staged changes to the local repository with a commit message?",
+    "answer": "git commit",
+    "explanation": "The 'git commit' command creates a snapshot of staged changes in the Git history.",
+    "accepted_answers": [
+      "git commit",
+      "commit"
+    ],
+    "aliases": [
+      "git commit",
+      "commit"
+    ],
+    "tags": [
+      "tech",
+      "git"
+    ],
+    "difficulty": "easy",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:10:26.944Z",
+      "review_count": 1
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:10:26.944Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_06_voice",
+    "type": "voice",
+    "content": "Say the name of the web technology protocol that enables bi-directional real-time communication between client and server.",
+    "answer": "WebSocket",
+    "explanation": "WebSocket provides full-duplex communication streams over a single TCP connection.",
+    "accepted_answers": [
+      "WebSocket",
+      "WebSockets"
+    ],
+    "aliases": [
+      "WebSocket",
+      "WebSockets"
+    ],
+    "tags": [
+      "tech",
+      "web"
+    ],
+    "difficulty": "medium",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:10:42.159Z",
+      "review_count": 1
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:10:42.159Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_07_image-select",
+    "type": "image-select",
+    "content": "Which image depicts a cloud server data center rack?",
+    "answer": "opt-2",
+    "explanation": "The cloud server data center rack image represents cloud database server infrastructure.",
+    "options": [
+      {
+        "id": "opt-1",
+        "content": "Network Router",
+        "image_url": "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=400",
+        "is_correct": false
+      },
+      {
+        "id": "opt-2",
+        "content": "Cloud Data Center",
+        "image_url": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=400",
+        "is_correct": true
+      },
+      {
+        "id": "opt-3",
+        "content": "Source Code",
+        "image_url": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400",
+        "is_correct": false
+      },
+      {
+        "id": "opt-4",
+        "content": "Satellite Dish",
+        "image_url": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400",
+        "is_correct": false
+      }
+    ],
+    "tags": [
+      "tech",
+      "hardware"
+    ],
+    "difficulty": "medium",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:11:04.436Z",
+      "review_count": 1
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:11:04.436Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_08_match",
+    "type": "match",
+    "content": "Match each internet protocol to its default standard port number:",
+    "answer": "p-1,p-2,p-3,p-4",
+    "explanation": "Standard network protocols listen on well-known IANA port numbers.",
+    "pairs": [
+      {
+        "id": "p-1",
+        "left": "HTTP",
+        "right": "Port 80"
+      },
+      {
+        "id": "p-2",
+        "left": "HTTPS",
+        "right": "Port 443"
+      },
+      {
+        "id": "p-3",
+        "left": "SSH",
+        "right": "Port 22"
+      },
+      {
+        "id": "p-4",
+        "left": "DNS",
+        "right": "Port 53"
+      }
+    ],
+    "tags": [
+      "tech",
+      "networking"
+    ],
+    "difficulty": "medium",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.5,
+      "repetitions": 1,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:10:57.998Z",
+      "review_count": 1
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:10:57.998Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_09_fill",
+    "type": "fill",
+    "content": "In Python, use the {{len}} function to calculate list length and the {{append}} method to add an element at the end.",
+    "answer": "len,append",
+    "explanation": "len() returns the item count of a collection, while list.append() appends an element to the list end.",
+    "blanks": [
+      {
+        "id": "blank-1",
+        "accepted_answers": [
+          "len"
+        ]
+      },
+      {
+        "id": "blank-2",
+        "accepted_answers": [
+          "append"
+        ]
+      }
+    ],
+    "tags": [
+      "tech",
+      "python"
+    ],
+    "difficulty": "medium",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:11:11.412Z",
+      "review_count": 1
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:11:11.412Z",
+    "deck_id": "default-test-deck-id"
+  },
+  {
+    "id": "test_10_order",
+    "type": "order",
+    "content": "Arrange the web browser rendering pipeline stages in chronological order:",
+    "answer": "DOM Tree Construction,CSSOM Construction,Render Tree Creation,Layout Computation,Pixel Painting",
+    "explanation": "The browser builds DOM from HTML, CSSOM from CSS, combines into Render Tree, computes Layout, and Paints pixels.",
+    "order_items": [
+      "DOM Tree Construction",
+      "CSSOM Construction",
+      "Render Tree Creation",
+      "Layout Computation",
+      "Pixel Painting"
+    ],
+    "tags": [
+      "tech",
+      "browser"
+    ],
+    "difficulty": "medium",
+    "source_file": "questions/test.json",
+    "srs": {
+      "interval": 1,
+      "ease_factor": 2.3,
+      "repetitions": 0,
+      "next_review": "2026-08-08T18:30:00.000Z",
+      "last_reviewed": "2026-08-08T17:12:17.540Z",
+      "review_count": 2
+    },
+    "created_at": "2026-08-08T17:04:00.000Z",
+    "updated_at": "2026-08-08T17:12:17.540Z",
+    "deck_id": "default-test-deck-id"
+  }
+]

@@ -1,0 +1,326 @@
+/**
+ * sidebar-001.css
+ * Precise recreation of original sidebar-001 design system.
+ * Scoped strictly to .sidebar-001-root to ensure exact 1:1 match with original.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+/* ─── CSS Variables for sidebar-001 ────────────────────────────────────── */
+.sidebar-001-root {
+  --sb-bg: #ffffff;
+  --sb-border: rgba(0, 0, 0, 0.07);
+  --sb-border-hover: rgba(0, 0, 0, 0.14);
+  --sb-text: #09090b;
+  --sb-text-secondary: rgba(9, 9, 11, 0.7);
+  --sb-text-muted: rgba(9, 9, 11, 0.45);
+  --sb-text-subtle: rgba(9, 9, 11, 0.35);
+  --sb-text-faint: rgba(9, 9, 11, 0.25);
+  --sb-tick-strong: rgba(9, 9, 11, 0.45);
+  --sb-tick-subtle: rgba(9, 9, 11, 0.2);
+  --sb-ruler-spine: rgba(9, 9, 11, 0.14);
+  --sb-ruler-spine-sub: rgba(9, 9, 11, 0.09);
+  --sb-hover-bg: rgba(0, 0, 0, 0.04);
+  --sb-accent-pro: #f43f5e; /* Exact vibrant pink/red from original */
+  --sb-font: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sb-font-mono: 'JetBrains Mono', monospace;
+
+  box-sizing: border-box;
+  font-family: var(--sb-font) !important;
+  color: var(--sb-text) !important;
+  background-color: var(--sb-bg) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .sidebar-001-root,
+.dark .sidebar-001-root {
+  --sb-bg: #09090b;
+  --sb-border: rgba(255, 255, 255, 0.07);
+  --sb-border-hover: rgba(255, 255, 255, 0.16);
+  --sb-text: #f4f4f5;
+  --sb-text-secondary: rgba(244, 244, 245, 0.75);
+  --sb-text-muted: rgba(244, 244, 245, 0.45);
+  --sb-text-subtle: rgba(244, 244, 245, 0.35);
+  --sb-text-faint: rgba(244, 244, 245, 0.25);
+  --sb-tick-strong: rgba(244, 244, 245, 0.45);
+  --sb-tick-subtle: rgba(244, 244, 245, 0.22);
+  --sb-ruler-spine: rgba(244, 244, 245, 0.14);
+  --sb-ruler-spine-sub: rgba(244, 244, 245, 0.09);
+  --sb-hover-bg: rgba(255, 255, 255, 0.06);
+  --sb-accent-pro: #f43f5e;
+}
+
+.sidebar-001-root *,
+.sidebar-001-root *::before,
+.sidebar-001-root *::after {
+  box-sizing: border-box;
+}
+
+/* ─── Layout & Flex Utilities ──────────────────────────────────────────── */
+.sidebar-001-root.flex,
+.sidebar-001-root .flex { display: flex !important; }
+
+.sidebar-001-root.flex-col,
+.sidebar-001-root .flex-col { flex-direction: column !important; }
+
+.sidebar-001-root .flex-1 { flex: 1 1 0% !important; min-height: 0 !important; }
+.sidebar-001-root .shrink-0 { flex-shrink: 0 !important; }
+.sidebar-001-root .items-center { align-items: center !important; }
+.sidebar-001-root .justify-between { justify-content: space-between !important; }
+
+/* ─── Positioning ──────────────────────────────────────────────────────── */
+.sidebar-001-root.relative,
+.sidebar-001-root .relative { position: relative !important; }
+
+.sidebar-001-root.absolute,
+.sidebar-001-root .absolute { position: absolute !important; }
+
+.sidebar-001-root .z-0 { z-index: 0 !important; }
+.sidebar-001-root .z-1 { z-index: 1 !important; }
+.sidebar-001-root .z-10 { z-index: 10 !important; }
+.sidebar-001-root .z-20 { z-index: 20 !important; }
+
+.sidebar-001-root .left-0 { left: 0 !important; }
+.sidebar-001-root .left-\[3px\] { left: 3px !important; }
+.sidebar-001-root .left-\[4px\] { left: 4px !important; }
+.sidebar-001-root .left-\[6px\] { left: 6px !important; }
+.sidebar-001-root .left-\[10px\] { left: 10px !important; }
+.sidebar-001-root .left-\[13px\] { left: 13px !important; }
+.sidebar-001-root .left-\[14px\] { left: 14px !important; }
+.sidebar-001-root .left-\[18px\] { left: 18px !important; }
+.sidebar-001-root .top-0 { top: 0 !important; }
+.sidebar-001-root .top-1\/4 { top: 25% !important; }
+.sidebar-001-root .top-1\/2 { top: 50% !important; }
+.sidebar-001-root .top-3\/4 { top: 75% !important; }
+.sidebar-001-root .bottom-0 { bottom: 0 !important; }
+.sidebar-001-root .right-0 { right: 0 !important; }
+
+.sidebar-001-root .-translate-y-1\/2 { transform: translateY(-50%) !important; }
+
+/* ─── Sizing ───────────────────────────────────────────────────────────── */
+.sidebar-001-root.w-full,
+.sidebar-001-root .w-full { width: 100% !important; }
+
+.sidebar-001-root.h-full,
+.sidebar-001-root .h-full { height: 100% !important; }
+
+.sidebar-001-root .w-px { width: 1px !important; }
+.sidebar-001-root .h-px { height: 1px !important; }
+.sidebar-001-root .w-1 { width: 4px !important; }
+.sidebar-001-root .w-\[13px\] { width: 13px !important; }
+.sidebar-001-root .w-\[14px\] { width: 14px !important; }
+.sidebar-001-root .w-\[16px\] { width: 16px !important; }
+.sidebar-001-root .w-\[18px\] { width: 18px !important; }
+.sidebar-001-root .w-\[22px\] { width: 22px !important; }
+.sidebar-001-root .w-\[23px\] { width: 23px !important; }
+.sidebar-001-root .w-\[26px\] { width: 26px !important; }
+.sidebar-001-root .h-\[1\.8px\] { height: 1.8px !important; }
+.sidebar-001-root .size-1\.5 { width: 6px !important; height: 6px !important; }
+.sidebar-001-root .size-3\.5 { width: 14px !important; height: 14px !important; }
+
+/* ─── Spacing ──────────────────────────────────────────────────────────── */
+.sidebar-001-root .gap-1\.5 { gap: 6px !important; }
+.sidebar-001-root .gap-2 { gap: 8px !important; }
+
+.sidebar-001-root .ml-2 { margin-left: 8px !important; }
+.sidebar-001-root .ml-2\.5 { margin-left: 10px !important; }
+.sidebar-001-root .ml-3 { margin-left: 12px !important; }
+.sidebar-001-root .ml-4 { margin-left: 16px !important; }
+.sidebar-001-root .mt-2 { margin-top: 8px !important; }
+.sidebar-001-root .mr-1 { margin-right: 4px !important; }
+
+.sidebar-001-root .px-0 { padding-left: 0 !important; padding-right: 0 !important; }
+.sidebar-001-root .px-1 { padding-left: 4px !important; padding-right: 4px !important; }
+.sidebar-001-root .px-1\.5 { padding-left: 6px !important; padding-right: 6px !important; }
+.sidebar-001-root .px-3 { padding-left: 12px !important; padding-right: 12px !important; }
+.sidebar-001-root .px-3\.5 { padding-left: 14px !important; padding-right: 14px !important; }
+
+.sidebar-001-root .py-0\.5 { padding-top: 2px !important; padding-bottom: 2px !important; }
+.sidebar-001-root .py-1 { padding-top: 4px !important; padding-bottom: 4px !important; }
+.sidebar-001-root .py-1\.5 { padding-top: 6px !important; padding-bottom: 6px !important; }
+.sidebar-001-root .py-2\.5 { padding-top: 10px !important; padding-bottom: 10px !important; }
+.sidebar-001-root .py-3 { padding-top: 12px !important; padding-bottom: 12px !important; }
+.sidebar-001-root .py-3\.5 { padding-top: 14px !important; padding-bottom: 14px !important; }
+.sidebar-001-root .py-4 { padding-top: 16px !important; padding-bottom: 16px !important; }
+
+.sidebar-001-root .pl-2\.5 { padding-left: 10px !important; }
+.sidebar-001-root .pl-3 { padding-left: 12px !important; }
+.sidebar-001-root .pl-3\.5 { padding-left: 14px !important; }
+.sidebar-001-root .pl-4 { padding-left: 16px !important; }
+.sidebar-001-root .pl-6 { padding-left: 24px !important; }
+.sidebar-001-root .pl-7 { padding-left: 28px !important; }
+.sidebar-001-root .pl-8 { padding-left: 32px !important; }
+.sidebar-001-root .pr-1\.5 { padding-right: 6px !important; }
+.sidebar-001-root .pr-2 { padding-right: 8px !important; }
+
+.sidebar-001-root .pt-0\.5 { padding-top: 2px !important; }
+.sidebar-001-root .pt-2 { padding-top: 8px !important; }
+.sidebar-001-root .pt-4 { padding-top: 16px !important; }
+.sidebar-001-root .pb-1 { padding-bottom: 4px !important; }
+.sidebar-001-root .pb-2 { padding-bottom: 8px !important; }
+.sidebar-001-root .pb-3 { padding-bottom: 12px !important; }
+.sidebar-001-root .pb-4 { padding-bottom: 16px !important; }
+
+.sidebar-001-root .sidebar-header-blur,
+.sidebar-header-blur {
+  background: linear-gradient(to bottom, var(--color-bg-primary) 70%, transparent 100%) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+.sidebar-001-root .sidebar-footer-blur,
+.sidebar-footer-blur {
+  background: linear-gradient(to top, var(--color-bg-primary) 70%, transparent 100%) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* ─── Typography & Colors ──────────────────────────────────────────────── */
+.sidebar-001-root .text-xs {
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.sidebar-001-root .text-sm {
+  font-size: 0.875rem !important;
+  line-height: 1.25rem !important;
+}
+
+.sidebar-001-root .text-\[11px\] {
+  font-size: 11px !important;
+  line-height: 14px !important;
+}
+
+.sidebar-001-root .text-\[12px\] {
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
+.sidebar-001-root .font-medium {
+  font-weight: 500 !important;
+}
+
+.sidebar-001-root .font-semibold {
+  font-weight: 600 !important;
+}
+
+.sidebar-001-root .text-left { text-align: left !important; }
+.sidebar-001-root .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.sidebar-001-root .select-none { user-select: none !important; }
+
+.sidebar-001-root .text-foreground {
+  color: var(--sb-text) !important;
+}
+
+.sidebar-001-root .text-foreground\/70 {
+  color: var(--sb-text-secondary) !important;
+}
+
+.sidebar-001-root .text-foreground\/45 {
+  color: var(--sb-text-muted) !important;
+}
+
+.sidebar-001-root .text-foreground\/40 {
+  color: var(--sb-text-muted) !important;
+}
+
+.sidebar-001-root .text-foreground\/35 {
+  color: var(--sb-text-subtle) !important;
+}
+
+.sidebar-001-root .text-foreground\/25 {
+  color: var(--sb-text-faint) !important;
+}
+
+.sidebar-001-root .hover\:text-foreground\/70:hover {
+  color: var(--sb-text-secondary) !important;
+}
+
+.sidebar-001-root .hover\:text-foreground:hover {
+  color: var(--sb-text) !important;
+}
+
+/* ─── Backgrounds & Ticks ──────────────────────────────────────────────── */
+.sidebar-001-root.bg-background,
+.sidebar-001-root .bg-background {
+  background-color: var(--sb-bg) !important;
+}
+
+.sidebar-001-root .bg-accent\/50 {
+  background-color: var(--sb-hover-bg) !important;
+}
+
+.sidebar-001-root .bg-accent-pro {
+  background-color: var(--sb-accent-pro) !important;
+}
+
+.sidebar-001-root .bg-foreground\/50 {
+  background-color: var(--sb-tick-strong) !important;
+}
+
+.sidebar-001-root .bg-foreground\/35 {
+  background-color: var(--sb-tick-subtle) !important;
+}
+
+.sidebar-001-root .bg-foreground\/30 {
+  background-color: var(--sb-tick-subtle) !important;
+}
+
+.sidebar-001-root .bg-foreground\/20 {
+  background-color: var(--sb-ruler-spine) !important;
+}
+
+.sidebar-001-root .bg-foreground\/15 {
+  background-color: var(--sb-ruler-spine-sub) !important;
+}
+
+/* ─── Borders & Dividers ───────────────────────────────────────────────── */
+.sidebar-001-root .rounded { border-radius: 4px !important; }
+.sidebar-001-root .rounded-md { border-radius: 6px !important; }
+.sidebar-001-root .rounded-full { border-radius: 9999px !important; }
+
+.sidebar-001-root .border {
+  border: 1px solid var(--sb-border) !important;
+}
+
+.sidebar-001-root .border-t {
+  border-top: 1px solid var(--sb-border) !important;
+}
+
+.sidebar-001-root .border-border\/50 {
+  border-color: var(--sb-border) !important;
+}
+
+/* ─── Group & Handle Hover ─────────────────────────────────────────────── */
+.sidebar-001-root .group { position: relative; }
+.sidebar-001-root .group:hover .group-hover\:text-foreground\/70 {
+  color: var(--sb-text-secondary) !important;
+}
+
+.sidebar-001-root .group\/handle { position: absolute; }
+.sidebar-001-root .group\/handle:hover .group-hover\/handle\:bg-border {
+  background-color: var(--sb-border-hover) !important;
+}
+
+/* ─── Misc ─────────────────────────────────────────────────────────────── */
+.sidebar-001-root .pointer-events-none { pointer-events: none !important; }
+.sidebar-001-root .cursor-pointer { cursor: pointer !important; }
+.sidebar-001-root .cursor-col-resize { cursor: col-resize !important; }
+.sidebar-001-root .overflow-y-auto { overflow-y: auto !important; }
+.sidebar-001-root .overflow-hidden { overflow: hidden !important; }
+.sidebar-001-root .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.sidebar-001-root .no-scrollbar::-webkit-scrollbar { display: none; }
+.sidebar-001-root .transition-colors {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+.sidebar-001-root .duration-150 { transition-duration: 150ms; }
+
+/* ─── Sidebar link styling ─────────────────────────────────────────────── */
+.sidebar-001-root a {
+  text-decoration: none !important;
+  color: inherit !important;
+}

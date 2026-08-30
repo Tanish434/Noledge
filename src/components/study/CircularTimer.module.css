@@ -1,0 +1,34 @@
+/**
+ * CircularTimer.module.css
+ * Pure minimal numbers — No borders, no backgrounds, sleek modern typography.
+ */
+
+.timerContainer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeText {
+  font-family: var(--font-sans);
+  font-size: inherit;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.colon {
+  margin: 0 1px;
+  opacity: 0.5;
+  font-weight: 600;
+  transform: translateY(-0.5px);
+}
