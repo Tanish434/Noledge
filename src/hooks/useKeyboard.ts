@@ -58,6 +58,11 @@ export function useKeyboard({
     (event: KeyboardEvent) => {
       if (!enabled) return;
 
+      // Don't fire shortcuts when AI drawer is open
+      if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-ai-drawer-open')) {
+        return;
+      }
+
       // Don't fire shortcuts when typing in inputs
       if (isInputOrEditable(event)) {
         return;

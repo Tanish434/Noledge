@@ -34,7 +34,7 @@ import { useSourceStore } from '@/stores/sourceStore';
 import PageTransition from '@/components/ui/PageTransition';
 import SourceManager from '@/components/sources/SourceManager';
 import CustomSelect from '@/components/ui/CustomSelect';
-import { Switch } from '@/components/unlumen-ui/primitives/switch';
+import { Switch } from '@/components/ui/Switch';
 import { useSync } from '@/hooks/useSync';
 import { useToast } from '@/components/ui/Toast';
 import { sounds } from '@/lib/sounds';
@@ -634,12 +634,36 @@ function SettingsPageContent() {
     }
   }, [isLoading, user, router]);
 
-  if (!isLoading && !user) {
+  if (isLoading) {
     return (
       <div className={styles.settings} style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
-          <ShieldCheck size={36} style={{ margin: '0 auto 12px', color: 'var(--color-accent)' }} />
-          <p style={{ fontSize: '14px' }}>Redirecting to sign in...</p>
+          <ShieldCheck size={36} style={{ margin: '0 auto 12px', color: 'var(--color-accent)', opacity: 0.8 }} />
+          <p style={{ fontSize: '14px' }}>Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    const returnUrl = typeof window !== 'undefined'
+      ? encodeURIComponent(window.location.pathname + window.location.search)
+      : encodeURIComponent('/settings');
+
+    return (
+      <div className={styles.settings} style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', color: 'var(--color-text-secondary)' }}>
+          <ShieldCheck size={38} style={{ margin: '0 auto 14px', color: 'var(--color-accent)' }} />
+          <h2 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 6px 0' }}>Authentication Required</h2>
+          <p style={{ fontSize: '13.5px', margin: '0 0 16px 0' }}>Please sign in to view and manage your account settings.</p>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => router.replace(`/auth?redirect=${returnUrl}`)}
+            style={{ margin: '0 auto' }}
+          >
+            Go to Sign In
+          </button>
         </div>
       </div>
     );

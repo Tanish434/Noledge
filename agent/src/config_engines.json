@@ -1,0 +1,7 @@
+{
+  "selected_stt": "livekit",
+  "selected_tts": "cartesia",
+  "selected_voice": "9626c31c-bec5-4cca-baa8-f8ba9e84c8bc",
+  "selected_llm": "gemini-3.5-flash-lite",
+  "enable_ocr": true
+}

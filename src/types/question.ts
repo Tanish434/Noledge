@@ -239,6 +239,7 @@ export interface Question {
   accepted_answers?: string[];
   aliases?: string[];
   explanation?: string;
+  hints?: string[] | string;
   media?: MediaAttachment[];
   code_language?: string;
 

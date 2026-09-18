@@ -523,3 +523,86 @@ export function scoreAnswer(
   done({ is_correct: result.is_correct, score: result.score });
   return result;
 }
+
+/**
+ * scoreAnswerAsync — async version of scoreAnswer with AI evaluation specifically
+ * for 'code' and 'voice' question types.
+ *
+ * For 'code': judges user code logic, syntax, and correctness via AI rather than static json.
+ * For 'voice': evaluates spoken conceptual correctness via AI.
+ * For all other types: strictly uses the standard deterministic scoring engines.
+ */
+export async function scoreAnswerAsync(
+  question: Question,
+  userAnswer: string | string[],
+  timeTakenMs: number
+): Promise<ScoreResult> {
+  if (typeof window !== 'undefined') {
+    // Special AI-judged integration for CODE
+    if (question.type === 'code') {
+      try {
+        const resp = await fetch('/api/agent/judge-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: String(userAnswer),
+            question: {
+              id: question.id,
+              type: question.type,
+              content: question.content,
+              answer: question.answer,
+              explanation: question.explanation,
+              code_language: question.code_language || 'python',
+            },
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          return {
+            is_correct: Boolean(data.is_correct),
+            score: typeof data.score === 'number' ? data.score : data.is_correct ? 1.0 : 0.0,
+            feedback: String(data.feedback || (data.is_correct ? 'Code is correct!' : 'Code is incorrect.')),
+            matched_answer: Array.isArray(question.answer) ? question.answer.join('\n') : String(question.answer || ''),
+          };
+        }
+      } catch (err) {
+        log.warn('ai_code_judge_failed', 'Failed calling /api/agent/judge-code, falling back to local scorer', { error: String(err) });
+      }
+    }
+
+    // Special AI-judged integration for VOICE
+    if (question.type === 'voice') {
+      try {
+        const resp = await fetch('/api/agent/judge-voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            spoken_answer: String(userAnswer),
+            question: {
+              id: question.id,
+              type: question.type,
+              content: question.content,
+              answer: question.answer,
+              explanation: question.explanation,
+            },
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          return {
+            is_correct: Boolean(data.is_correct),
+            score: typeof data.score === 'number' ? data.score : data.is_correct ? 1.0 : 0.0,
+            feedback: String(data.feedback || (data.is_correct ? 'Spoken answer is correct!' : 'Incorrect answer.')),
+            matched_answer: Array.isArray(question.answer) ? question.answer.join(', ') : String(question.answer || ''),
+          };
+        }
+      } catch (err) {
+        log.warn('ai_voice_judge_failed', 'Failed calling /api/agent/judge-voice, falling back to local scorer', { error: String(err) });
+      }
+    }
+  }
+
+  // All other types strictly use standard algorithmic evaluation
+  return scoreAnswer(question, userAnswer, timeTakenMs);
+}
+

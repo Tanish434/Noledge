@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shared Conversation — aliph1</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2244%22 fill=%22%234F46E5%22/><text y=%22.9em%22 x=%22.18em%22 font-size=%2256%22 font-weight=%22bold%22 fill=%22white%22>α</text></svg>">
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="./css/style.css?v=2.6">
+  
+  <!-- Markdown & Mermaid & Chart engines -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      overflow-y: auto !important;
+      background: radial-gradient(circle at 50% 0%, #FFFFFF 0%, #F8FAFC 50%, #EEF2F6 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 48px;
+    }
+    .share-container {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .share-header-bar {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 18px;
+      padding: 16px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px -4px rgba(15, 23, 42, 0.05);
+    }
+    .share-meta-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .share-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 18px;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+    }
+    .share-titles h1 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #0F172A;
+      margin: 0;
+      line-height: 1.2;
+    }
+    .share-titles p {
+      font-size: 12px;
+      color: #64748B;
+      margin: 3px 0 0;
+    }
+    .share-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .share-btn {
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 10px;
+      border: 1px solid #CBD5E1;
+      background: #FFFFFF;
+      color: #334155;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      text-decoration: none;
+    }
+    .share-btn:hover {
+      background: #F8FAFC;
+      border-color: #94A3B8;
+      color: #0F172A;
+    }
+    .share-btn.primary {
+      background: #4F46E5;
+      border-color: #4F46E5;
+      color: #FFFFFF;
+    }
+    .share-btn.primary:hover {
+      background: #4338CA;
+    }
+    .share-card-wrap {
+      background: #FFFFFF;
+      border-radius: 20px;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      min-height: 300px;
+    }
+    .share-card-wrap .transcript-list {
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .share-banner {
+      font-size: 12px;
+      color: #4F46E5;
+      background: #EEF2FF;
+      border: 1px solid #C7D2FE;
+      padding: 8px 14px;
+      border-radius: 8px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="share-container">
+    <header class="share-header-bar">
+      <div class="share-meta-left">
+        <div class="share-avatar">α</div>
+        <div class="share-titles">
+          <h1 id="view-session-title">Shared Conversation</h1>
+          <p id="view-session-meta">aliph1 AI Session • Read-Only Viewer</p>
+        </div>
+      </div>
+      <div class="share-actions">
+        <a href="/" class="share-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+          Open App
+        </a>
+        <button class="share-btn" id="btn-copy-md">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          Copy Text
+        </button>
+        <button class="share-btn primary" id="btn-download-html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download (.html)
+        </button>
+      </div>
+    </header>
+
+    <div class="share-card-wrap">
+      <div class="share-banner">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        <span>Viewing shared conversation transcript with <strong>aliph1</strong>. Diagrams, charts, and messages are rendered exactly as in the live session.</span>
+      </div>
+
+      <div class="transcript-list" id="transcript-list">
+        <div style="text-align:center; padding: 40px 0; color: #94A3B8;">Loading conversation...</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if (typeof window.mermaid !== "undefined") {
+      try {
+        window.mermaid.initialize({
+          startOnLoad: false,
+          suppressErrorRendering: true,
+          theme: 'neutral',
+          securityLevel: 'loose',
+          fontFamily: "'Plus Jakarta Sans', -apple-system, sans-serif",
+          flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' }
+        });
+      } catch (e) {
+        console.warn("Mermaid init:", e);
+      }
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text || "";
+      return div.innerHTML;
+    }
+
+    function getDiagramTitle(code) {
+      const c = (code || "").trim();
+      if (/tree/i.test(c)) return "Tree Hierarchy Diagram";
+      if (/^sequenceDiagram/i.test(c)) return "Sequence Architecture";
+      if (/^classDiagram/i.test(c)) return "Class Architecture";
+      if (/^stateDiagram/i.test(c)) return "State Machine";
+      if (/^erDiagram/i.test(c)) return "Entity Relationship Model";
+      if (/^journey/i.test(c)) return "User Journey Flow";
+      if (/^gantt/i.test(c)) return "Gantt Timeline";
+      if (/^pie/i.test(c)) return "Distribution Chart";
+      if (/^gitGraph/i.test(c)) return "Git Version Graph";
+      if (/^mindmap/i.test(c)) return "Mind Map";
+      return "Flowchart Architecture";
+    }
+
+    function sanitizeMermaidCode(code) {
+      if (!code) return "";
+      const lines = code.split("\n");
+      const cleaned = [];
+      let subgraphIdx = 0;
+      for (let i = 0; i < lines.length; i++) {
+        let line = lines[i];
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("%%") || trimmed.toLowerCase() === "end") {
+          cleaned.push(line);
+          continue;
+        }
+        if (/^\s*(classDef|class|style|linkStyle|click)\b/i.test(trimmed)) {
+          cleaned.push(line);
+          continue;
+        }
+        if (/^(graph|flowchart)\s+[A-Za-z0-9]+/i.test(trimmed)) {
+          cleaned.push(line);
+          continue;
+        }
+        const sgMatch = line.match(/^(\s*subgraph\s+)(.+)$/i);
+        if (sgMatch) {
+          const indent = sgMatch[1];
+          const rawTitle = sgMatch[2].trim();
+          if (/^[A-Za-z0-9_]+\s*\["[^"]+"\]$/.test(rawTitle)) {
+            cleaned.push(line);
+          } else {
+            subgraphIdx++;
+            cleaned.push(`${indent}sg_${subgraphIdx} ["${rawTitle.replace(/["\[\]]/g, "'")}"]`);
+          }
+          continue;
+        }
+        let cur = line.replace(/--+>/g, "-->");
+        cur = cur.replace(/(-->|---|==>|\.\.>)\s*\|([^|]+)\|/g, (match, arrow, label) => {
+          const trimLabel = label.trim();
+          if (trimLabel.startsWith('"') && trimLabel.endsWith('"')) return `${arrow}|${trimLabel}|`;
+          return `${arrow}|"${trimLabel.replace(/"/g, "'")}"|`;
+        });
+        cur = cur.replace(/([A-Za-z0-9_]+)\s*\[\s*([^(\][^\]]*?)\s*\]/g, (match, id, text) => {
+          const t = text.trim();
+          if (t.startsWith('"') && t.endsWith('"')) return `${id}[${t}]`;
+          return `${id}["${t.replace(/"/g, "'")}"]`;
+        });
+        cleaned.push(cur);
+      }
+      return cleaned.join("\n");
+    }
+
+    function renderMarkdownAndCharts(content) {
+      if (typeof window.marked !== "undefined") {
+        try {
+          const rawHtml = window.marked.parse(content);
+          const temp = document.createElement("div");
+          temp.innerHTML = rawHtml;
+
+          const chartConfigs = [];
+          const mermaidBlocks = [];
+
+          temp.querySelectorAll("pre code").forEach((codeEl, idx) => {
+            const rawCode = codeEl.textContent.trim();
+            const isMermaid = codeEl.classList.contains("language-mermaid") || /^(graph\s+[A-Za-z0-9]+|flowchart\s+[A-Za-z0-9]+|sequenceDiagram)/i.test(rawCode);
+
+            if (isMermaid) {
+              const mId = `share-mermaid-${Date.now()}-${idx}-${Math.floor(Math.random()*1000)}`;
+              const wrapper = document.createElement("div");
+              wrapper.className = "mermaid-diagram-card";
+              wrapper.innerHTML = `
+                <div class="diagram-header">
+                  <span class="diagram-badge">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4"></path></svg>
+                    ${escapeHtml(getDiagramTitle(rawCode))}
+                  </span>
+                </div>
+                <div class="mermaid-diagram-viewport">
+                  <div class="mermaid-diagram-content" id="${mId}">
+                    <div class="mermaid-loading">Rendering Diagram...</div>
+                  </div>
+                </div>
+              `;
+              const pre = codeEl.closest("pre");
+              if (pre) pre.replaceWith(wrapper);
+              else codeEl.replaceWith(wrapper);
+              mermaidBlocks.push({ id: mId, code: rawCode });
+            }
+          });
+
+          return { html: temp.innerHTML, charts: chartConfigs, mermaids: mermaidBlocks };
+        } catch (e) {
+          console.warn("Markdown parse err:", e);
+        }
+      }
+      return { html: escapeHtml(content), charts: [], mermaids: [] };
+    }
+
+    async function triggerEnhancements(mermaids) {
+      if (!mermaids || !window.mermaid) return;
+      for (const { id, code } of mermaids) {
+        const container = document.getElementById(id);
+        if (!container) continue;
+        const sanitized = sanitizeMermaidCode(code);
+        const renderSvgId = "sharesvg-" + Math.random().toString(36).substring(2, 9);
+        try {
+          const { svg } = await window.mermaid.render(renderSvgId, sanitized);
+          if (svg && !svg.includes("Syntax error in text")) {
+            container.innerHTML = svg;
+            const svgEl = container.querySelector("svg");
+            if (svgEl) {
+              svgEl.style.display = "block";
+              svgEl.style.maxWidth = "100%";
+              svgEl.style.height = "auto";
+            }
+            continue;
+          }
+        } catch (err1) {
+          try {
+            const rawSvgId = "sharerawsvg-" + Math.random().toString(36).substring(2, 9);
+            const { svg } = await window.mermaid.render(rawSvgId, code);
+            if (svg && !svg.includes("Syntax error in text")) {
+              container.innerHTML = svg;
+              continue;
+            }
+          } catch (err2) {}
+          container.innerHTML = `<pre class="mermaid-fallback"><code>${escapeHtml(code)}</code></pre>`;
+        }
+      }
+    }
+
+    let currentMessages = [];
+
+    async function loadSharedSession() {
+      const parts = window.location.pathname.split("/share/");
+      const sessionId = parts[1] || "";
+      if (!sessionId) {
+        document.getElementById("transcript-list").innerHTML = `<div style="text-align:center; padding: 40px; color:#EF4444;">Invalid session link.</div>`;
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/share/${sessionId}`);
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.messages)) {
+          document.getElementById("transcript-list").innerHTML = `<div style="text-align:center; padding: 40px; color:#94A3B8;">Conversation not found or empty.</div>`;
+          return;
+        }
+
+        const session = data.session || {};
+        document.getElementById("view-session-title").textContent = session.title || "Shared Conversation";
+        document.title = `${session.title || 'Shared Conversation'} — aliph1`;
+        
+        currentMessages = data.messages;
+        const listEl = document.getElementById("transcript-list");
+        listEl.innerHTML = "";
+
+        const allMermaids = [];
+
+        data.messages.forEach(msg => {
+          const row = document.createElement("div");
+          row.className = `msg-row ${msg.role}`;
+          const speaker = msg.speaker || (msg.role === "user" ? "User" : "aliph1");
+
+          if (msg.role === "assistant") {
+            const { html, mermaids } = renderMarkdownAndCharts(msg.content);
+            row.innerHTML = `
+              <div class="msg-info">${escapeHtml(speaker)}</div>
+              <div class="msg-bubble">${html}</div>
+            `;
+            listEl.appendChild(row);
+            if (mermaids && mermaids.length) allMermaids.push(...mermaids);
+          } else {
+            row.innerHTML = `
+              <div class="msg-info">${escapeHtml(speaker)}</div>
+              <div class="msg-bubble">${escapeHtml(msg.content)}</div>
+            `;
+            listEl.appendChild(row);
+          }
+        });
+
+        triggerEnhancements(allMermaids);
+      } catch (err) {
+        document.getElementById("transcript-list").innerHTML = `<div style="text-align:center; padding: 40px; color:#EF4444;">Error loading conversation: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    document.getElementById("btn-copy-md").addEventListener("click", () => {
+      if (!currentMessages || !currentMessages.length) return;
+      const title = document.getElementById("view-session-title").textContent;
+      let md = `# ${title}\n*aliph1 Conversation Session*\n\n---\n\n`;
+      currentMessages.forEach(m => {
+        const spk = m.speaker || (m.role === "user" ? "User" : "aliph1");
+        md += `### ${spk}:\n${m.content}\n\n`;
+      });
+      navigator.clipboard.writeText(md).then(() => {
+        const btn = document.getElementById("btn-copy-md");
+        const prev = btn.innerHTML;
+        btn.innerHTML = `✓ Copied!`;
+        setTimeout(() => btn.innerHTML = prev, 2000);
+      });
+    });
+
+    document.getElementById("btn-download-html").addEventListener("click", () => {
+      const clone = document.documentElement.cloneNode(true);
+      const blob = new Blob([clone.outerHTML], { type: "text/html;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `aliph1_conversation_${Date.now()}.html`;
+      a.click();
+    });
+
+    window.addEventListener("DOMContentLoaded", loadSharedSession);
+  </script>
+</body>
+</html>

@@ -190,6 +190,7 @@ const FlashCard = React.forwardRef<FlashCardRef, FlashCardProps>(function FlashC
   }, [question.id]);
 
   const { haptics_enabled, sound_enabled, reduce_motion, font_size, font_family, compact_mode, high_contrast, card_glow, auto_advance, auto_advance_delay_ms } = useSettingsStore();
+  const lastScoreResult = useQuestionStore((s) => s.lastScoreResult);
   const { trigger: haptic } = useHaptics(haptics_enabled);
   const reducedMotion = reduce_motion;
 
@@ -525,6 +526,32 @@ const FlashCard = React.forwardRef<FlashCardRef, FlashCardProps>(function FlashC
             <div className={cn('eyebrow', styles.answerLabel)}>
               {cardState === 'answered-correct' ? '✓ Correct!' : '✗ Answer Revealed'}
             </div>
+
+            {lastScoreResult?.feedback && (question.type === 'code' || question.type === 'voice') && (
+              <div
+                style={{
+                  background: lastScoreResult.is_correct ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                  border: `1px solid ${lastScoreResult.is_correct ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                  color: lastScoreResult.is_correct ? 'var(--color-success)' : 'var(--color-danger)',
+                  padding: '10px 14px',
+                  borderRadius: 'var(--radius-md)',
+                  marginBottom: '14px',
+                  fontSize: '13px',
+                  lineHeight: '1.5',
+                }}
+              >
+                <div style={{ fontWeight: 600, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>{lastScoreResult.is_correct ? '✓ AI Evaluation Passed' : '✗ AI Evaluation Feedback'}</span>
+                  <span style={{ fontSize: '11px', opacity: 0.85, padding: '1px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.1)' }}>
+                    Score: {Math.round(lastScoreResult.score * 100)}%
+                  </span>
+                </div>
+                <p style={{ margin: 0, color: 'var(--color-text-primary)', fontSize: '13px', whiteSpace: 'pre-wrap' }}>
+                  {lastScoreResult.feedback}
+                </p>
+              </div>
+            )}
+
             <div className={styles.correctAnswer}>
               <span className="text-secondary text-sm">Correct answer:</span>
               {question.type === 'code' || question.code_language ? (

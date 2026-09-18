@@ -87,10 +87,12 @@ export interface UseVoiceReturn {
  * @returns UseVoiceReturn
  */
 export function useVoice(language: string = 'en-US'): UseVoiceReturn {
-  const isSupported = typeof window !== 'undefined' && (
+  const hasNativeSpeech = typeof window !== 'undefined' && (
     'SpeechRecognition' in window || 'webkitSpeechRecognition' in window
   );
-  const hasNativeSpeech = isSupported;
+  const isSupported = typeof window !== 'undefined' && (
+    hasNativeSpeech || (Boolean(navigator?.mediaDevices?.getUserMedia) && typeof MediaRecorder !== 'undefined')
+  );
 
   // ─── State ────────────────────────────────────────────────────────────
   const [state, setState] = useState<VoiceState>('idle');
@@ -101,6 +103,8 @@ export function useVoice(language: string = 'en-US'): UseVoiceReturn {
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const createRecognition = useCallback((): SpeechRecognition | null => {
     if (!hasNativeSpeech) return null;
@@ -167,6 +171,9 @@ export function useVoice(language: string = 'en-US'): UseVoiceReturn {
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
     }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch (e) { /* ignore */ }
+    }
 
     setTranscript('');
     setFinalTranscript('');
@@ -187,14 +194,87 @@ export function useVoice(language: string = 'en-US'): UseVoiceReturn {
       }
     }
 
+    // MediaRecorder recording fallback (e.g. Firefox)
     if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices
         .getUserMedia({ audio: true })
         .then((stream) => {
           mediaStreamRef.current = stream;
+          audioChunksRef.current = [];
+
+          let mimeType = 'audio/webm';
+          if (typeof MediaRecorder !== 'undefined') {
+            if (!MediaRecorder.isTypeSupported('audio/webm') && MediaRecorder.isTypeSupported('audio/ogg')) {
+              mimeType = 'audio/ogg';
+            }
+          }
+
+          const mr = new MediaRecorder(stream, { mimeType });
+          mediaRecorderRef.current = mr;
+
+          mr.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+              audioChunksRef.current.push(e.data);
+            }
+          };
+
+          mr.onstop = () => {
+            // Cleanly stop media tracks now that recorder is done
+            if (mediaStreamRef.current) {
+              try {
+                mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+              } catch {}
+              mediaStreamRef.current = null;
+            }
+
+            const chunks = [...audioChunksRef.current];
+            audioChunksRef.current = [];
+            if (chunks.length === 0) {
+              setState('done');
+              return;
+            }
+
+            const recordedBlob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+            setState('processing');
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+              const base64Data = (reader.result as string)?.split(',')[1];
+              if (!base64Data) {
+                setState('done');
+                return;
+              }
+
+              try {
+                const res = await fetch('/api/agent/transcribe', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ audio: base64Data, mimeType: recordedBlob.type }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  const txt = String(data.text || '').trim();
+                  if (txt) {
+                    setTranscript(txt);
+                    setFinalTranscript(txt);
+                    setConfidence(0.95);
+                  }
+                }
+              } catch (txErr) {
+                log.warn('transcribe_fallback_failed', 'Failed to transcribe audio blob', { error: String(txErr) });
+              } finally {
+                setState('done');
+              }
+            };
+            reader.readAsDataURL(recordedBlob);
+          };
+
+          mr.start(100);
         })
         .catch((err) => {
           log.warn('mic_access_warning', 'Mic permission requested or unavailable', { error: String(err) });
+          setError('Microphone access denied or unavailable.');
+          setState('error');
         });
     }
 
@@ -205,12 +285,18 @@ export function useVoice(language: string = 'en-US'): UseVoiceReturn {
     if (recognitionRef.current && hasNativeSpeech) {
       setState('processing');
       try { recognitionRef.current.stop(); } catch (e) { setState('done'); }
-    } else {
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-        mediaStreamRef.current = null;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      setState('processing');
+      try {
+        if (typeof mediaRecorderRef.current.requestData === 'function') {
+          mediaRecorderRef.current.requestData();
+        }
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        setState('done');
       }
-      setState('done');
     }
   }, [hasNativeSpeech]);
 
@@ -219,15 +305,19 @@ export function useVoice(language: string = 'en-US'): UseVoiceReturn {
       try { recognitionRef.current.abort(); } catch (e) { /* ignore */ }
       recognitionRef.current = null;
     }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try { mediaRecorderRef.current.stop(); } catch (e) { /* ignore */ }
+      mediaRecorderRef.current = null;
+    }
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
     }
+    audioChunksRef.current = [];
     setTranscript('');
     setFinalTranscript('');
     setConfidence(0);
     setError(null);
-    setState('idle');
   }, []);
 
   // ─── Cleanup on unmount ────────────────────────────────────────────────

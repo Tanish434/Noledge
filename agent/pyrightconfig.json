@@ -1,0 +1,13 @@
+{
+  "include": [
+    "src"
+  ],
+  "extraPaths": [
+    "src",
+    ".",
+    "C:/Users/001bi/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "typeCheckingMode": "off"
+}

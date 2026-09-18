@@ -27,7 +27,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import type { Question, QuestionOption } from '@/types/question';
-import { RotateCcw, X, Check, Type, ArrowRight, Square, CheckSquare, ChevronUp, ChevronDown, GripVertical, Terminal, Play, Mic } from 'lucide-react';
+import { RotateCcw, X, Check, Type, ArrowRight, Square, CheckSquare, ChevronUp, ChevronDown, GripVertical, Terminal, Play, Mic, Sparkles, Loader2 } from 'lucide-react';
 import { useVoice } from '@/hooks/useVoice';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { sanitizeHtml, renderMarkdownToHtml } from '@/utils/sanitize';
@@ -344,6 +344,7 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
   const { state, transcript, finalTranscript, start, stop, reset, isSupported } = useVoice(voice_language);
   const [inputText, setInputText] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
 
   // Synchronize transcript from voice hook
   React.useEffect(() => {
@@ -352,6 +353,22 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
       setInputText(liveText);
     }
   }, [transcript, finalTranscript]);
+
+  // Listen for real-time speech answer submitted directly by Voice Agent
+  React.useEffect(() => {
+    const handleAgentAnswer = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && !submitted && isActive) {
+        setSubmitted(true);
+        if (detail.user_answer) {
+          setInputText(detail.user_answer);
+        }
+        await onAnswer(detail.user_answer || inputText.trim() || 'Spoken answer submitted to Agent');
+      }
+    };
+    window.addEventListener('noledge_agent_answer_submitted', handleAgentAnswer);
+    return () => window.removeEventListener('noledge_agent_answer_submitted', handleAgentAnswer);
+  }, [submitted, isActive, onAnswer, inputText]);
 
   const handleMicClick = () => {
     if (submitted) return;
@@ -375,9 +392,14 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!isActive || submitted || !inputText.trim()) return;
+    if (!isActive || submitted || !inputText.trim() || isEvaluating) return;
+    setIsEvaluating(true);
     setSubmitted(true);
-    await onAnswer(inputText.trim());
+    try {
+      await onAnswer(inputText.trim());
+    } finally {
+      setIsEvaluating(false);
+    }
   };
 
   return (
@@ -394,7 +416,7 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
             state === 'listening' && styles.micPulseActive
           )}
           onClick={handleMicClick}
-          disabled={!isActive || submitted}
+          disabled={!isActive || submitted || isEvaluating}
           aria-label="Toggle voice recording"
         >
           <div className={styles.micIconWrapper}>
@@ -404,10 +426,10 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
 
         <p className={styles.voiceStatusText}>
           {state === 'listening'
-            ? 'Listening to your voice… tap mic to stop'
-            : !isSupported
-            ? 'Speech Recognition API disabled in Firefox — tap mic or speak below:'
-            : 'Tap microphone to start speaking'}
+            ? 'Listening to your voice… tap mic when done'
+            : state === 'processing'
+            ? 'Transcribing your voice with AI…'
+            : 'Tap microphone and speak, or type your answer below:'}
         </p>
 
         {/* Live Transcript / Response Input */}
@@ -419,11 +441,11 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
               className={styles.voiceTranscriptInput}
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Your spoken answer will appear here..."
-              disabled={!isActive || submitted}
+              placeholder="Spoken answer evaluated by AI..."
+              disabled={!isActive || submitted || isEvaluating}
               autoComplete="off"
             />
-            {inputText && !submitted && (
+            {inputText && !submitted && !isEvaluating && (
               <button
                 type="button"
                 className={styles.typingClearBtn}
@@ -439,10 +461,19 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
             id="voice-submit"
             type="submit"
             className={cn('btn', 'btn-primary', styles.typingSubmitBtn)}
-            disabled={!isActive || submitted || !inputText.trim()}
+            disabled={!isActive || submitted || !inputText.trim() || isEvaluating}
           >
-            <span>{submitted ? 'Submitted' : 'Submit'}</span>
-            <ArrowRight size={16} strokeWidth={2.5} />
+            {isEvaluating ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                <span>Judging...</span>
+              </>
+            ) : (
+              <>
+                <span>{submitted ? 'Evaluated' : 'Submit & AI Judge'}</span>
+                <ArrowRight size={16} strokeWidth={2.5} />
+              </>
+            )}
           </button>
         </form>
       </div>
@@ -1139,12 +1170,56 @@ function CodeQuestion({ question, onAnswer, isActive }: {
 }) {
   const [value, setValue] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isJudging, setIsJudging] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<{ is_correct: boolean; feedback: string } | null>(null);
+
+  // Debounced real-time code buffer synchronization to Agent context
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetch('/api/agent/context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code_buffer: value,
+          question: {
+            id: question.id,
+            type: question.type,
+            content: question.content,
+            answer: question.answer,
+            explanation: question.explanation,
+            code_language: question.code_language || 'python',
+          },
+        }),
+      }).catch(() => {});
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [value, question]);
+
+  // Listen for LiveKit Voice Agent code judging verdicts
+  React.useEffect(() => {
+    const handleAgentJudged = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail && !submitted && isActive) {
+        setSubmitted(true);
+        setAiFeedback({ is_correct: Boolean(detail.is_correct), feedback: String(detail.feedback || '') });
+        await onAnswer(value.trim() || String(question.answer || ''));
+      }
+    };
+    window.addEventListener('noledge_agent_code_judged', handleAgentJudged);
+    return () => window.removeEventListener('noledge_agent_code_judged', handleAgentJudged);
+  }, [submitted, isActive, onAnswer, value, question.answer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isActive || submitted || !value.trim()) return;
+    if (!isActive || submitted || !value.trim() || isJudging) return;
+    setIsJudging(true);
     setSubmitted(true);
-    await onAnswer(value.trim());
+
+    try {
+      await onAnswer(value.trim());
+    } finally {
+      setIsJudging(false);
+    }
   };
 
   const lang = (question.code_language ?? 'python').toLowerCase();
@@ -1164,7 +1239,7 @@ function CodeQuestion({ question, onAnswer, isActive }: {
               <Terminal size={14} />
               <span>{lang.toUpperCase()}</span>
             </div>
-            {value && !submitted ? (
+            {value && !submitted && !isJudging ? (
               <button
                 type="button"
                 className={styles.codeClearBtn}
@@ -1183,7 +1258,7 @@ function CodeQuestion({ question, onAnswer, isActive }: {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={`# Write your ${lang} code here...`}
-            disabled={!isActive || submitted}
+            disabled={!isActive || submitted || isJudging}
             spellCheck={false}
             autoCorrect="off"
             autoCapitalize="off"
@@ -1199,15 +1274,41 @@ function CodeQuestion({ question, onAnswer, isActive }: {
             }}
           />
         </div>
-        <button
-          id="code-submit"
-          type="submit"
-          className={cn('btn', 'btn-primary', styles.codeSubmitBtn)}
-          disabled={!isActive || submitted || !value.trim()}
-        >
-          <Play size={15} fill="currentColor" />
-          <span>{submitted ? 'Submitted' : 'Run & Submit'}</span>
-        </button>
+
+        {/* Action controls row: Run & Evaluate Submit button */}
+        <div className={styles.codeActionRow}>
+          <button
+            id="code-submit"
+            type="submit"
+            className={cn('btn', 'btn-primary', styles.codeSubmitBtn)}
+            disabled={!isActive || submitted || !value.trim() || isJudging}
+          >
+            {isJudging ? (
+              <>
+                <Loader2 size={15} className="animate-spin" />
+                <span>AI Evaluating Code...</span>
+              </>
+            ) : (
+              <>
+                <Play size={15} fill="currentColor" />
+                <span>{submitted ? 'Code Evaluated' : 'Run & Evaluate Code'}</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Direct objective AI feedback (no unrequested lecturing) */}
+        {aiFeedback && (
+          <div
+            className={cn(
+              styles.codeFeedbackBox,
+              aiFeedback.is_correct ? styles.codeFeedbackCorrect : styles.codeFeedbackWrong
+            )}
+          >
+            <strong>{aiFeedback.is_correct ? '✓ Code Passed' : '✗ Issues Found'}</strong>
+            <p>{aiFeedback.feedback}</p>
+          </div>
+        )}
       </form>
     </div>
   );
@@ -1219,14 +1320,30 @@ function CodeQuestion({ question, onAnswer, isActive }: {
 
 /**
  * QuestionRenderer — routes to the correct question type component.
- *
- * The switch statement is the single place where question types are mapped
- * to components. Adding a new type requires:
- *   1. Adding a case here
- *   2. Creating/defining the component
- *   3. Ensuring the type is in the QuestionType union (types/question.ts)
  */
 export default function QuestionRenderer({ question, isActive, onAnswer }: QuestionRendererProps) {
+  // Proactively synchronize active study question with the Agent context
+  React.useEffect(() => {
+    if (isActive && question) {
+      void fetch('/api/agent/context', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: {
+            id: question.id,
+            type: question.type,
+            content: question.content,
+            options: question.options,
+            answer: question.answer,
+            explanation: question.explanation,
+            hints: question.hints,
+            code_language: question.code_language || 'python',
+          },
+        }),
+      }).catch(() => {});
+    }
+  }, [question, isActive]);
+
   const handleAnswer = useCallback(async (answer: string | string[]) => {
     await onAnswer(answer);
   }, [onAnswer]);

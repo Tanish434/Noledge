@@ -39,6 +39,11 @@ yarn-error.log*
 client_secret*.json
 credentials*.json
 *.secret.json
+agent/.env*
+!agent/.env.example
+agent/src/*keys.json
+agent/src/*.db
+agent/**/__pycache__
 
 # vercel
 .vercel

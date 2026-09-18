@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/utils/cn";
 import { sounds } from "@/lib/sounds";
 import { useSettingsStore } from "@/stores/settingsStore";
-import "./sidebar-001.css";
+import "./SidebarPrimitives.css";
 
 const EFFECTS_KEY = "sidebar-001-effects";
 
@@ -667,3 +667,14 @@ export function Sidebar001Footer({
     </div>
   );
 }
+
+// ─── Clean Semantic Aliases ──────────────────────────────────────────────────
+export const SidebarContainer = Sidebar001;
+export const SidebarHeader = Sidebar001Header;
+export const SidebarContent = Sidebar001Content;
+export const SidebarSection = Sidebar001Section;
+export const SidebarItem = Sidebar001Item;
+export const SidebarSubItem = Sidebar001SubItem;
+export const SidebarFooter = Sidebar001Footer;
+export const useSidebarEffects = useSidebar001Effects;
+

@@ -278,6 +278,7 @@ export const useDeckStore = create<DeckState>((set, get) => ({
                   stats: createDefaultStats(),
                 };
                 decksMap[DEFAULT_DECK_ID] = defaultDeck;
+                set({ decks: { ...decksMap } });
 
                 const { useQuestionStore } = await import('./questionStore');
                 const qArr = seedQuestions.map((q: any) => ({

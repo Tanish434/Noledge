@@ -1,0 +1,28 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\001bi\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/agent",
+    "${workspaceFolder}/agent/src",
+    "C:/Users/001bi/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/agent",
+    "${workspaceFolder}/agent/src",
+    "C:/Users/001bi/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+  ],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none",
+    "reportGeneralTypeIssues": "none",
+    "reportOptionalMemberAccess": "none",
+    "reportUnknownMemberType": "none",
+    "reportWildcardImportFromLibrary": "none"
+  },
+  "python.analysis.typeCheckingMode": "off",
+  "python.linting.enabled": false,
+  "ruff.enable": false,
+  "ruff.lint.ignore": ["ALL"],
+  "flake8.args": ["--ignore=ALL"]
+}

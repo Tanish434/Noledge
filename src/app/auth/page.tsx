@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { ScrambleText } from '@/components/ui/ScrambleText';
 import { cn } from '@/utils/cn';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, ArrowLeft } from 'lucide-react';
 import styles from './auth.module.css';
 
 type AuthMode = 'signin' | 'signup' | 'magic';
@@ -99,6 +100,10 @@ function AuthForm() {
   if (magicSent) {
     return (
       <div className={styles.authPage}>
+        <Link href="/" className={styles.backHomeBtn}>
+          <ArrowLeft size={15} />
+          <span>Back to home</span>
+        </Link>
         <div className={styles.card}>
           <div className={styles.logo}>
             <div className={styles.logoMark}>📬</div>
@@ -111,6 +116,11 @@ function AuthForm() {
           <button className="btn btn-ghost w-full" onClick={() => setMagicSent(false)}>
             ← Use a different email
           </button>
+          <div className={styles.homeLinkWrap}>
+            <Link href="/" className={styles.homeLink}>
+              <ArrowLeft size={14} /> Back to home
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -118,6 +128,10 @@ function AuthForm() {
 
   return (
     <div className={styles.authPage} suppressHydrationWarning>
+      <Link href="/" className={styles.backHomeBtn}>
+        <ArrowLeft size={15} />
+        <span>Back to home</span>
+      </Link>
       <div
         ref={cardRef}
         className={styles.card}
@@ -331,6 +345,12 @@ function AuthForm() {
             ← Back to email/password
           </button>
         )}
+
+        <div className={styles.homeLinkWrap}>
+          <Link href="/" className={styles.homeLink}>
+            <ArrowLeft size={14} /> Back to home
+          </Link>
+        </div>
       </div>
     </div>
   );

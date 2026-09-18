@@ -15,7 +15,7 @@
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Outfit:wght@300..800&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap');
-@import '../components/ui/sidebar-001.css';
+@import '../components/ui/SidebarPrimitives.css';
 
 /* ===========================================================================
    DARK THEME (default)

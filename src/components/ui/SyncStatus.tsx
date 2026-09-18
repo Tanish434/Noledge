@@ -33,6 +33,8 @@ export default function SyncStatus({ compact = false }: { compact?: boolean }) {
     ? new Date(lastSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : 'Never';
 
+  const [confirmSignOut, setConfirmSignOut] = React.useState(false);
+
   if (compact) {
     return (
       <div className={styles.compact} title={config.label}>
@@ -40,8 +42,6 @@ export default function SyncStatus({ compact = false }: { compact?: boolean }) {
       </div>
     );
   }
-
-  const [confirmSignOut, setConfirmSignOut] = React.useState(false);
 
   return (
     <div className={styles.container}>

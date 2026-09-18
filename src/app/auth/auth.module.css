@@ -1,4 +1,5 @@
 .authPage {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8,6 +9,33 @@
   box-sizing: border-box;
   overflow: hidden;
   background: radial-gradient(circle at 50% 0%, rgba(139, 92, 246, 0.08) 0%, transparent 70%), var(--color-bg);
+}
+
+.backHomeBtn {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top, 20px));
+  left: max(20px, env(safe-area-inset-left, 20px));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+  text-decoration: none;
+  transition: all 0.18s ease;
+  z-index: 10;
+}
+
+.backHomeBtn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-2);
+  transform: translateX(-2px);
 }
 
 .card {
@@ -217,4 +245,29 @@
   flex: 1;
   height: 1px;
   background: var(--color-border);
+}
+
+.homeLinkWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.homeLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  text-decoration: none;
+  transition: all 0.15s ease;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.homeLink:hover {
+  color: var(--color-text-primary);
+  background: var(--color-surface-2);
+  transform: translateX(-2px);
 }

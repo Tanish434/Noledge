@@ -308,6 +308,7 @@ export default function CardStack({ className, isGlobalTest }: CardStackProps) {
   // Listen for standalone F key for Zen Focus Mode
   useEffect(() => {
     const handleZenKey = (e: KeyboardEvent) => {
+      if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-ai-drawer-open')) return;
       if (isInputOrEditable(e) || hasModifierKey(e)) return;
 
       if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {

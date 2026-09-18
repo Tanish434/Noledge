@@ -1,0 +1,14 @@
+{
+  "question": {
+    "id": "test_01_code",
+    "type": "code",
+    "content": "Complete the Python function to return the sum of all even numbers in a given list :",
+    "answer": "def sum_evens(numbers):\n    return sum(n for n in numbers if n % 2 == 0)",
+    "explanation": "Generator expression filters even numbers (n % 2 == 0) and sum() computes their total.",
+    "code_language": "python"
+  },
+  "code_buffer": "def sum_evens (numbers):\n  return sum(n for n in numbers if n % 2 == 0)",
+  "deck_name": "all",
+  "card_index": 5,
+  "path": "/study"
+}

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { sounds } from '@/lib/sounds';
+import AiTutorDrawer from '@/components/study/AiTutorDrawer';
 
 function RouteScrollReset() {
   const pathname = usePathname();
@@ -115,6 +116,7 @@ export default function AppProviders({ children }: { children: React.ReactNode }
         <RouteScrollReset />
       </Suspense>
       {children}
+      <AiTutorDrawer />
     </>
   );
 }

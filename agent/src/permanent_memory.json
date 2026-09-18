@@ -1,0 +1,29 @@
+{
+  "user_id": "Kirito",
+  "memories": [
+    {
+      "id": "mem_pref_identity",
+      "text": "Primary user identity is Kirito.",
+      "category": "identity",
+      "created_at": 1789398000
+    },
+    {
+      "id": "mem_7e057d14",
+      "text": "The primary user's preferred name identity is Kirito.",
+      "category": "identity",
+      "created_at": 1789422564
+    },
+    {
+      "id": "mem_1f01d717",
+      "text": "The primary user's preferred name identity is Keshav.",
+      "category": "identity",
+      "created_at": 1789448769
+    },
+    {
+      "id": "mem_fac13c03",
+      "text": "User's favorite visual orb shader / avatar is Volumetric Rays (SHDR-31).",
+      "category": "preferences",
+      "created_at": 1789458651
+    }
+  ]
+}

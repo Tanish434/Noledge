@@ -27,7 +27,6 @@ import CardStack from '@/components/cards/CardStack';
 import DeckCard from '@/components/cards/DeckCard';
 import CircularTimer from '@/components/study/CircularTimer';
 import LiveStatsPanel from '@/components/study/LiveStatsPanel';
-import AiTutorDrawer from '@/components/study/AiTutorDrawer';
 import PageTransition from '@/components/ui/PageTransition';
 import { cn } from '@/utils/cn';
 import { isInputOrEditable, hasModifierKey } from '@/utils/keyboard';
@@ -44,6 +43,7 @@ function KeyboardHints() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (typeof document !== 'undefined' && document.documentElement.hasAttribute('data-ai-drawer-open')) return;
       if (isInputOrEditable(e) || hasModifierKey(e)) return;
 
       if (e.key === '?') {
@@ -493,7 +493,6 @@ function StudyPageContent() {
             </div>
           )}
 
-          <AiTutorDrawer />
           <KeyboardHints />
         </>
       );
@@ -593,8 +592,7 @@ function StudyPageContent() {
           </div>
         </main>
 
-        {/* Floating AI Tutor Drawer & Keyboard Hints */}
-        <AiTutorDrawer />
+        {/* Keyboard Hints */}
         <div className={styles.desktopOnlyControl}>
           <KeyboardHints />
         </div>

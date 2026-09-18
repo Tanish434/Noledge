@@ -33,6 +33,7 @@ import { gsap } from 'gsap';
 import { X, CheckCircle2, AlertTriangle, Info, XCircle } from 'lucide-react';
 import { UI } from '@/lib/constants';
 import { cn } from '@/utils/cn';
+import { generatePrefixedId } from '@/utils/id';
 import styles from './Toast.module.css';
 
 // =============================================================================
@@ -158,9 +159,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     variant: ToastVariant = 'info',
     duration?: number
   ) => {
-    const id = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const id = generatePrefixedId('toast');
     setToasts((prev) => [...prev, { id, message, variant, duration }]);
   }, []);
 

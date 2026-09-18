@@ -37,7 +37,7 @@ import {
   Sidebar001Item,
   Sidebar001SubItem,
   Sidebar001Footer,
-} from './sidebar-001';
+} from './SidebarPrimitives';
 import { SidebarToggleIcon } from './SidebarToggleIcon';
 import Popover from './Popover';
 import SyncStatus from './SyncStatus';
@@ -803,15 +803,15 @@ function MobileDock() {
   const isMainSliding = pointerX !== null;
   const isSubSliding  = subPointerX !== null;
 
-  // ── Hide dock during active test sessions or on auth pages (mobile only) ─
-  if (pathname === '/auth' || pathname.startsWith('/auth')) {
-    return null;
-  }
-
   const activeSession = useQuestionStore((s) => s.activeSession);
   const isStudyPage   = pathname === '/study';
   const hasTestParams = searchParams.has('deck') || searchParams.has('mode');
   const isTestActive  = isStudyPage && hasTestParams && !!(activeSession && !activeSession.finished_at);
+
+  // ── Hide dock during active test sessions or on auth pages (mobile only) ─
+  if (pathname === '/auth' || pathname.startsWith('/auth')) {
+    return null;
+  }
 
   return (
     <div

@@ -14,7 +14,7 @@ import {
   deleteQuestion as deleteFromIDB,
 } from '@/lib/storage';
 import { updateSRS, createInitialSRS, isDueToday } from '@/engine/srs/sm2';
-import { scoreAnswer } from '@/engine/scoring/scoreEngine';
+import { scoreAnswer, scoreAnswerAsync, type ScoreResult } from '@/engine/scoring/scoreEngine';
 import { updateStreak } from '@/engine/scoring/streakTracker';
 import { useDeckStore } from './deckStore';
 import { useSourceStore } from './sourceStore';
@@ -23,6 +23,7 @@ import { serializeQuestionToMarkdown } from '@/lib/markdownParser';
 import { getFileHandleSync, requestWritePermissionInGesture, preloadAllFileHandles } from '@/lib/fileHandleStore';
 import { createLogger } from '@/lib/logger';
 import { recordStudyActivity } from '@/lib/activityTracker';
+import { generatePrefixedId } from '@/utils/id';
 
 if (typeof window !== 'undefined') {
   void preloadAllFileHandles();
@@ -43,6 +44,9 @@ interface QuestionState {
 
   // Index into the current session's question queue
   currentCardIndex: number;
+
+  // Last evaluation verdict from scoring engine (for AI code & voice cards)
+  lastScoreResult: ScoreResult | null;
 
   // Whether questions are loading for a deck
   loadingDeckId: string | null;
@@ -68,10 +72,7 @@ interface QuestionState {
 // Session ID Generator
 // =============================================================================
 function generateSessionId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `sess-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  return generatePrefixedId('sess');
 }
 
 /**
@@ -269,6 +270,7 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
   questionsByDeck: {},
   activeSession: null,
   currentCardIndex: 0,
+  lastScoreResult: null,
   loadingDeckId: null,
   error: null,
 
@@ -522,8 +524,8 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
     }
     if (!question) return false;
 
-    // Score the answer using the per-type engine
-    const scoreResult = scoreAnswer(question, userAnswer, timeTakenMs);
+    // Score the answer using the per-type engine (AI-evaluated for code & voice)
+    const scoreResult = await scoreAnswerAsync(question, userAnswer, timeTakenMs);
     const isCorrect = scoreResult.is_correct;
 
     // Build the attempt record
@@ -592,7 +594,7 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
         });
       }
 
-      return { activeSession: newSession };
+      return { activeSession: newSession, lastScoreResult: scoreResult };
     });
 
     recordStudyActivity(1);
@@ -821,6 +823,7 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
         if (!state.activeSession) return {};
         return {
           currentCardIndex: nextIndex,
+          lastScoreResult: null,
           activeSession: {
             ...state.activeSession,
             question_ids: questionIds,
@@ -838,7 +841,7 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
   previousCard: () => {
     const { currentCardIndex } = get();
     if (currentCardIndex > 0) {
-      set({ currentCardIndex: currentCardIndex - 1 });
+      set({ currentCardIndex: currentCardIndex - 1, lastScoreResult: null });
     }
   },
 
@@ -877,8 +880,9 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
         }
 
         // Record best accuracy achieved in a session
-        const sessionAccuracy = session.total_cards > 0
-          ? Math.round((session.correct_count / session.total_cards) * 100)
+        const attempts = finishedSession.attempts || [];
+        const sessionAccuracy = attempts.length > 0
+          ? Math.round(((finishedSession.correct_count || 0) / attempts.length) * 100)
           : 0;
         const accKey = `noledge_deck_best_acc_${deckId}`;
         const prevBestAcc = parseInt(localStorage.getItem(accKey) || '0', 10);
@@ -896,11 +900,11 @@ export const useQuestionStore = create<QuestionState>((set, get) => ({
       correct: finishedSession.correct_count,
     });
 
-    set({ activeSession: finishedSession, currentCardIndex: 0 });
+    set({ activeSession: finishedSession, currentCardIndex: 0, lastScoreResult: null });
   },
 
   clearSession: () => {
-    set({ activeSession: null, currentCardIndex: 0 });
+    set({ activeSession: null, currentCardIndex: 0, lastScoreResult: null });
   },
 
   /**
