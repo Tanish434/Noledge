@@ -79,5 +79,10 @@ export function getAgentEnv(): Record<string, string> {
   return envVars;
 }
 
-export const AGENT_BACKEND_PORT = 5050;
-export const AGENT_BACKEND_URL = `http://127.0.0.1:${AGENT_BACKEND_PORT}`;
+export const AGENT_BACKEND_PORT = Number(process.env.AGENT_BACKEND_PORT || 5050);
+// Public base URL of the Python agent (Flask). Locally it's localhost:5050;
+// when the agent is hosted (Railway/Render/VPS), set AGENT_BACKEND_URL on the
+// Next.js host (e.g. https://noledge-agent.up.railway.app). Falls back to localhost.
+export const AGENT_BACKEND_URL =
+  (process.env.AGENT_BACKEND_URL || '').replace(/\/+$/, '') ||
+  `http://127.0.0.1:${AGENT_BACKEND_PORT}`;

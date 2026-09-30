@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AGENT_BACKEND_PORT } from '@/lib/agentServer';
+import { AGENT_BACKEND_URL } from '@/lib/agentServer';
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const q = searchParams.get('q');
     const endpoint = q
-      ? `http://localhost:${AGENT_BACKEND_PORT}/api/history/search?q=${encodeURIComponent(q)}`
-      : `http://localhost:${AGENT_BACKEND_PORT}/api/history/sessions`;
+      ? `${AGENT_BACKEND_URL}/api/history/search?q=${encodeURIComponent(q)}`
+      : `${AGENT_BACKEND_URL}/api/history/sessions`;
 
     const res = await fetch(endpoint, { cache: 'no-store' });
     if (res.ok) {
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const res = await fetch(`http://localhost:${AGENT_BACKEND_PORT}/api/history/sessions/new`, {
+    const res = await fetch(`${AGENT_BACKEND_URL}/api/history/sessions/new`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE() {
   try {
-    const res = await fetch(`http://localhost:${AGENT_BACKEND_PORT}/api/history/clear`, {
+    const res = await fetch(`${AGENT_BACKEND_URL}/api/history/clear`, {
       method: 'DELETE',
       cache: 'no-store',
     });

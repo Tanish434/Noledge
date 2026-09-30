@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { AGENT_BACKEND_PORT, getAgentEnv } from '@/lib/agentServer';
+import { AGENT_BACKEND_URL, getAgentEnv } from '@/lib/agentServer';
 
 const AVATAR_MAP: Record<string, string> = {
   earth: '🌍',
@@ -442,9 +442,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── 5. Try Python Backend Server first ──────────────────────────────
+    // ── 5. Try Python Backend Server first (local or hosted via AGENT_BACKEND_URL) ──
     try {
-      const pyRes = await fetch(`http://localhost:${AGENT_BACKEND_PORT}/api/chat`, {
+      const pyRes = await fetch(`${AGENT_BACKEND_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

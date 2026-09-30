@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AGENT_BACKEND_PORT } from '@/lib/agentServer';
+import { AGENT_BACKEND_URL } from '@/lib/agentServer';
 
 export async function GET(
   req: NextRequest,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { sessionId } = await params;
-    const res = await fetch(`http://localhost:${AGENT_BACKEND_PORT}/api/history/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(`${AGENT_BACKEND_URL}/api/history/sessions/${encodeURIComponent(sessionId)}`, {
       cache: 'no-store',
     });
 
@@ -28,7 +28,7 @@ export async function DELETE(
 ) {
   try {
     const { sessionId } = await params;
-    const res = await fetch(`http://localhost:${AGENT_BACKEND_PORT}/api/history/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(`${AGENT_BACKEND_URL}/api/history/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',
       cache: 'no-store',
     });
@@ -51,7 +51,7 @@ export async function PATCH(
   try {
     const { sessionId } = await params;
     const body = await req.json();
-    const res = await fetch(`http://localhost:${AGENT_BACKEND_PORT}/api/history/sessions/${encodeURIComponent(sessionId)}`, {
+    const res = await fetch(`${AGENT_BACKEND_URL}/api/history/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
