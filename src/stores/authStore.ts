@@ -119,11 +119,32 @@ export const useAuthStore = create<AuthStoreState>((set) => ({
       log.error('auth_signout_failed', 'Error during Supabase signout', e);
     }
     if (typeof window !== 'undefined') {
+      // Selective clear: preserve chat history, study progress, and voice profile.
+      // Previous localStorage.clear() wiped aliph1 sessions, orb prefs, and code buffers.
       try {
-        localStorage.clear();
+        const preserve: Record<string, string | null> = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('aliph1_') || k.startsWith('noledge_') || k === 'selected_orb_variant')) {
+            preserve[k] = localStorage.getItem(k);
+          }
+        }
+        // Remove only Supabase auth keys (sb-*) and app session flags.
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('sb-') || k.startsWith('supabase.'))) toRemove.push(k);
+        }
+        toRemove.forEach((k) => localStorage.removeItem(k));
+        // Restore preserved keys (in case of quota or race).
+        for (const [k, v] of Object.entries(preserve)) {
+          if (v !== null) {
+            try { localStorage.setItem(k, v); } catch {}
+          }
+        }
         sessionStorage.clear();
       } catch (err) {
-        log.error('storage_clear_failed', 'Failed to clear local storage', err);
+        log.error('storage_clear_failed', 'Failed to clear auth storage', err);
       }
     }
     set({ isLoading: false, error: null });

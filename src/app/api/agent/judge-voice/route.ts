@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       // Fallback
     }
 
-    // 2. Direct server-side Gemini fallback
+    // 2. Direct server-side Gemini fallback (bounded: 1 key, 2 models)
     const env = getAgentEnv();
     const apiKey = env['GEMINI_API_KEY'] || env['GOOGLE_API_KEY'];
 
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
         `User Spoken Answer:\n"${spoken_answer}"\n\n` +
         'Evaluate the spoken answer. Return JSON only:';
 
-      const models = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+      const models = ['gemini-3.5-flash-lite', 'gemini-3.5-flash'];
       for (const m of models) {
         try {
           const gResp = await fetch(

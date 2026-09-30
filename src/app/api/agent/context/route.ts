@@ -50,9 +50,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // 1. Sync to local file immediately
+    // 1. Sync to local file immediately with atomic deep-merge (never clobber code_buffer or question).
     const current = readLocalContext();
-    const merged = { ...current, ...(body || {}) };
+    const merged: Record<string, any> = { ...current };
+    for (const [k, v] of Object.entries(body || {})) {
+      if (k === 'question' && v && typeof v === 'object' && current.question && typeof current.question === 'object') {
+        merged.question = { ...(current.question as object), ...(v as object) };
+      } else if (v !== undefined) {
+        merged[k] = v;
+      }
+    }
     writeLocalContext(merged);
 
     // 2. Also notify Python server if running

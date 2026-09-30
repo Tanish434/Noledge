@@ -42,7 +42,7 @@ export interface UserSettings {
   sync_on_reconnect: boolean;    // Sync immediately when internet reconnects
   ai_provider: 'gemini' | 'openai' | 'groq' | 'openrouter' | 'custom'; // AI Provider for AI Tutor
   ai_api_key: string;            // User's custom AI API key
-  ai_model: string;              // Model ID (e.g. gemini-2.0-flash, gpt-4o-mini, llama-3.3-70b)
+  ai_model: string;              // Model ID (e.g. gemini-3.5-flash-lite, gemini-3.5-flash)
   ai_custom_endpoint?: string;   // Optional custom OpenAI-compatible endpoint
 }
 
@@ -81,7 +81,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   sync_on_reconnect: true,
   ai_provider: 'gemini',
   ai_api_key: '',
-  ai_model: 'gemini-2.0-flash',
+  ai_model: 'gemini-3.5-flash-lite',
   ai_custom_endpoint: '',
 };
 
@@ -105,7 +105,8 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'noledge:settings',
       storage: createJSONStorage(() => localStorage),
-      // Only persist the settings values, not the action functions
+      // Only persist the settings values, not the action functions.
+      // NOTE: ai_api_key is intentionally never persisted (security).
       partialize: (state) => ({
         theme: state.theme,
         haptics_enabled: state.haptics_enabled,
@@ -130,6 +131,9 @@ export const useSettingsStore = create<SettingsState>()(
         sync_interval_mins: state.sync_interval_mins,
         sync_on_app_focus: state.sync_on_app_focus,
         sync_on_reconnect: state.sync_on_reconnect,
+        ai_provider: state.ai_provider,
+        ai_model: state.ai_model,
+        ai_custom_endpoint: state.ai_custom_endpoint,
       }),
     }
   )

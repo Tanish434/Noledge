@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import time
 import logging
@@ -27,21 +28,6 @@ SPEAKERS_FILE = Path(__file__).parent / "speakers.json"
 
 _cached_stt = None
 _cached_tts = None
-_last_audio_snapshot = bytearray()
-
-def get_last_audio_snapshot() -> bytes:
-    return bytes(_last_audio_snapshot)
-
-def set_last_audio_snapshot(pcm: bytes):
-    global _last_audio_snapshot
-    _last_audio_snapshot = bytearray(pcm)
-
-def append_to_audio_snapshot(pcm: bytes):
-    if len(_last_audio_snapshot) < 16000 * 2 * 12: # up to 12s buffer
-        _last_audio_snapshot.extend(pcm)
-
-def clear_audio_snapshot():
-    _last_audio_snapshot.clear()
 
 def load_engine_config() -> dict:
     if CONFIG_FILE.exists():
@@ -372,11 +358,12 @@ class VoiceBiometricManager:
             lid = sp.get("label_id", "S1")
             vp = sp.get("voiceprint") or {}
             emb = vp.get("embedding")
+            # Fingerprint is 32-dim cepstral embedding (see extract_fingerprint).
             res.append({
                 "label_id": lid,
                 "name": sp.get("label", "User"),
                 "is_primary": (lid == "S1"),
-                "has_voiceprint": bool(emb and len(emb) == 128),
+                "has_voiceprint": bool(emb and len(emb) == 32),
                 "samples": vp.get("samples", 0),
                 "updated_at": sp.get("updated_at", "")
             })
@@ -610,27 +597,42 @@ def manage_speakers(action: str, name: Optional[str] = None, label_id: Optional[
     return {"status": "error", "message": f"Unknown action '{action}'. Supported: list, enroll, rename, delete."}
 
 # =========================================================
-# LiveKit Credentials Pool
+# LiveKit Credentials Pool (env + pool file, deduped)
 # =========================================================
 def get_all_active_livekit_credentials() -> list[dict]:
     creds = []
+    seen_keys: set[str] = set()
+
+    def _add(label: str, ak: Optional[str], sec: Optional[str], url: Optional[str]):
+        if ak and sec and is_valid_token(ak) and ak.strip() not in seen_keys:
+            seen_keys.add(ak.strip())
+            creds.append({"label": label, "api_key": ak.strip(), "api_secret": sec.strip(), "url": url})
     k1 = os.getenv("LIVEKIT_API_KEY")
     s1 = os.getenv("LIVEKIT_API_SECRET")
     u1 = os.getenv("LIVEKIT_URL")
-    if k1 and s1:
-        creds.append({"label": "Primary Account", "api_key": k1.strip(), "api_secret": s1.strip(), "url": u1})
+    _add("Primary Account", k1, s1, u1)
 
     k2 = os.getenv("LIVEKIT_API_KEY_2")
     s2 = os.getenv("LIVEKIT_API_SECRET_2")
     u2 = os.getenv("LIVEKIT_URL_2") or u1
-    if k2 and s2:
-        creds.append({"label": "Account 2", "api_key": k2.strip(), "api_secret": s2.strip(), "url": u2})
+    _add("Account 2", k2, s2, u2)
 
     k3 = os.getenv("LIVEKIT_API_KEY_3")
     s3 = os.getenv("LIVEKIT_API_SECRET_3")
     u3 = os.getenv("LIVEKIT_URL_3") or u1
-    if k3 and s3:
-        creds.append({"label": "Account 3", "api_key": k3.strip(), "api_secret": s3.strip(), "url": u3})
+    _add("Account 3", k3, s3, u3)
+
+    # Also include keys added at runtime via manage_api_keys_pool (pool file), deduped.
+    try:
+        pool_path = Path(__file__).parent / "livekit_keys.json"
+        if pool_path.exists():
+            with open(pool_path, "r", encoding="utf-8") as f:
+                pool_data = json.load(f)
+            for _k, rec in (pool_data.get("keys", {}) or {}).items():
+                if isinstance(rec, dict) and rec.get("status", "active") == "active":
+                    _add(str(rec.get("key_id", "Pool Account")), rec.get("api_key"), rec.get("api_secret"), rec.get("url") or u1)
+    except Exception:
+        pass
 
     return creds
 
@@ -688,15 +690,37 @@ class BaseQuotaKeyManager:
         except Exception:
             pass
 
-    def mark_exhausted(self, api_key: str):
+    def mark_exhausted(self, api_key: str, reset_in_days: int = 30):
+        """Single canonical implementation: mark a key exhausted with cooldown (std-lib only)."""
         data = self._load_records()
         records_map = data.get("keys", {})
-        if api_key in records_map:
-            records_map[api_key]["status"] = "exhausted"
-            data["keys"] = records_map
-            self._save_records(data)
-            self._cached_records = None
-            self._last_refresh_time = 0.0
+        now = time.time()
+        for k, rec in records_map.items():
+            if k == api_key or rec.get("api_key") == api_key:
+                rec["status"] = "exhausted"
+                rec["reset_unix"] = int(now + reset_in_days * 86400)
+                rec["days_until_reset"] = reset_in_days
+                rec["last_checked"] = int(now)
+                break
+        else:
+            # Key not in pool file yet: record it as exhausted so rotation skips it.
+            if api_key:
+                records_map[api_key] = {
+                    "key_id": f"Account_exhausted_{api_key[:6]}...{api_key[-4:]}" if len(api_key) >= 10 else "Account_exhausted",
+                    "api_key": api_key,
+                    "status": "exhausted",
+                    "reset_unix": int(now + reset_in_days * 86400),
+                    "days_until_reset": reset_in_days,
+                    "last_checked": int(now),
+                }
+                data["keys"] = records_map
+        self._save_records(data)
+        self._cached_records = None
+        self._last_refresh_time = 0.0
+        try:
+            reset_cached_tts()
+        except Exception:
+            pass
 
     def sync_and_get_records(self, force_remote_check: bool = False) -> list[dict]:
         now = time.time()
@@ -766,21 +790,6 @@ class BaseQuotaKeyManager:
                     if not is_exhausted and clean_env not in active:
                         active.append(clean_env)
         return active
-
-    def mark_exhausted(self, api_key: str, reset_in_days: int = 30):
-        data = self._load_records()
-        records_map = data.get("keys", {})
-        now = time.time()
-        for k, rec in records_map.items():
-            if k == api_key or rec.get("api_key") == api_key:
-                rec["status"] = "exhausted"
-                rec["reset_unix"] = int(now + reset_in_days * 86400)
-                rec["days_until_reset"] = reset_in_days
-                rec["last_checked"] = int(now)
-                break
-        self._save_records(data)
-        self._cached_records = None
-        reset_cached_tts()
 
 # =========================================================
 # ElevenLabs Key Manager
@@ -1229,25 +1238,44 @@ def get_tts():
         return _cached_tts
 
 # =========================================================
-# Status Inspection Helpers
+# Status Inspection Helpers (single source of truth, no hard-coded LiveKit label)
 # =========================================================
+_STT_DISPLAY = {
+    "livekit": ("LiveKit Cloud STT (Deepgram Nova-3 English)", "⭐ Deepgram Nova-3 (<150ms)"),
+    "speechmatics": ("Speechmatics STT (Broadcast English)", "👂 Speechmatics HD"),
+    "elevenlabs": ("ElevenLabs Scribe v2 Realtime", "🎙️ Scribe v2 (~123ms)"),
+    "google": ("Google Cloud Speech-to-Text (en-US)", "⚡ Google STT"),
+    "gemini": ("Google Cloud Speech-to-Text (en-US)", "⚡ Google STT"),
+    "browser": ("Browser Web Speech API", "🌐 Native"),
+}
+_TTS_DISPLAY = {
+    "cartesia": ("Cartesia Sonic-3.5 (Ultra-low latency)", "⚡ Sonic-3.5 (<90ms)"),
+    "elevenlabs": ("ElevenLabs Turbo v2.5 / v4 Turbo", "🎙️ Studio (~135ms)"),
+    "google": ("Google Gemini Voice (Journey/Neural2)", "⚡ Gemini Voice"),
+    "gemini": ("Google Gemini Voice (Journey/Neural2)", "⚡ Gemini Voice"),
+    "livekit": ("LiveKit Cloud Voice (Inference)", "☁️ LiveKit Inference"),
+    "browser": ("Browser SpeechSynthesis (Local)", "🌐 Local"),
+}
+
 def get_active_stt_info() -> dict:
     cfg = load_engine_config()
-    selected = cfg.get("selected_stt", "livekit")
+    selected = str(cfg.get("selected_stt", "livekit")).lower()
+    name, badge = _STT_DISPLAY.get(selected, (f"STT ({selected})", "🎙️ STT"))
     return {
         "id": selected,
-        "name": f"LiveKit Cloud STT ({selected.capitalize()})",
-        "badge": "⭐ LiveKit STT (Deepgram Nova-3 English)",
+        "name": name,
+        "badge": badge,
         "is_fallback": False
     }
 
 def get_active_tts_info() -> dict:
     cfg = load_engine_config()
-    selected = cfg.get("selected_tts", "cartesia")
+    selected = str(cfg.get("selected_tts", "cartesia")).lower()
+    name, badge = _TTS_DISPLAY.get(selected, (f"TTS ({selected})", "🎙️ Voice"))
     return {
         "id": selected,
-        "name": f"Text-to-Speech ({selected.capitalize()})",
-        "badge": "🎙️ High-Fidelity English Voice",
+        "name": name,
+        "badge": badge,
         "is_fallback": False
     }
 
@@ -1595,8 +1623,8 @@ def get_settings_overview() -> dict:
         "active_voice_id": active_voice_id,
         "current_llm": cfg.get("selected_llm", "gemini-3.5-flash-lite"),
         "ocr_enabled": cfg.get("enable_ocr", True),
-        "available_stt": ["livekit", "speechmatics", "cartesia", "elevenlabs"],
-        "available_tts": ["cartesia", "elevenlabs", "livekit"],
+        "available_stt": ["livekit", "speechmatics", "elevenlabs", "google", "browser"],
+        "available_tts": ["cartesia", "elevenlabs", "livekit", "google", "browser"],
         "available_voices": available_voices,
         "available_llms": ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.1-flash-lite", "gemini-3.5-flash"],
         "message": f"Active Settings: STT={cfg.get('selected_stt')}, TTS={current_tts}, Voice={active_voice_name}, LLM={cfg.get('selected_llm')}, OCR={'Active' if cfg.get('enable_ocr', True) else 'Disabled'}."
@@ -1615,21 +1643,23 @@ def switch_engines(
 
     if stt:
         s = stt.lower().strip()
-        if s in ["livekit", "speechmatics", "cartesia", "elevenlabs"]:
-            cfg["selected_stt"] = s
-            changed.append(f"STT -> {s}")
+        # Sep-2026 reality: no Cartesia STT provider exists in livekit-plugins;
+        # supported STT are livekit (Nova-3), speechmatics, elevenlabs (Scribe v2), google, browser.
+        if s in ["livekit", "speechmatics", "elevenlabs", "google", "gemini", "browser"]:
+            cfg["selected_stt"] = "google" if s == "gemini" else s
+            changed.append(f"STT -> {cfg['selected_stt']}")
             reset_cached_stt()
         else:
-            return {"status": "error", "message": f"Invalid STT '{stt}'. Supported: livekit, speechmatics, cartesia, elevenlabs."}
+            return {"status": "error", "message": f"Invalid STT '{stt}'. Supported: livekit, speechmatics, elevenlabs, google, browser (cartesia has no STT engine)."}
 
     if tts:
         t = tts.lower().strip()
-        if t in ["cartesia", "elevenlabs", "livekit"]:
-            cfg["selected_tts"] = t
-            changed.append(f"TTS -> {t}")
+        if t in ["cartesia", "elevenlabs", "livekit", "google", "gemini", "browser"]:
+            cfg["selected_tts"] = "google" if t == "gemini" else t
+            changed.append(f"TTS -> {cfg['selected_tts']}")
             reset_cached_tts()
         else:
-            return {"status": "error", "message": f"Invalid TTS '{tts}'. Supported: cartesia, elevenlabs, livekit."}
+            return {"status": "error", "message": f"Invalid TTS '{tts}'. Supported: cartesia, elevenlabs, livekit, google, browser."}
 
     if voice:
         v_clean = voice.strip().lower()
@@ -1705,10 +1735,16 @@ def get_active_study_context() -> dict:
     return {"question": None, "code_buffer": "", "deck_name": "", "card_index": 0}
 
 def update_active_study_context(data: dict) -> dict:
-    """Update active study card, code buffer, and deck context."""
+    """Atomic deep-merge update: never clobber code_buffer when only question changes and vice versa."""
     ctx = get_active_study_context()
     if isinstance(data, dict):
-        ctx.update(data)
+        for k, v in data.items():
+            if k == "question" and isinstance(v, dict) and isinstance(ctx.get("question"), dict):
+                merged_q = {**ctx["question"], **v}
+                # Preserve options/answer if incoming question omits them (partial sync from code editor).
+                ctx["question"] = merged_q
+            elif v is not None:
+                ctx[k] = v
     try:
         with open(ACTIVE_CONTEXT_FILE, "w", encoding="utf-8") as f:
             json.dump(ctx, f, indent=2, ensure_ascii=False)
@@ -1757,7 +1793,12 @@ def evaluate_with_gemini(system_prompt: str, user_prompt: str) -> Optional[dict]
                     res_json = json.loads(resp.read().decode("utf-8"))
                     text = res_json.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
                     if text:
-                        return json.loads(text.strip())
+                        clean = text.strip()
+                        # Strip markdown code fences (```json ... ```) using std-lib only.
+                        if clean.startswith("```"):
+                            clean = re.sub(r"^```(?:json)?\s*", "", clean)
+                            clean = re.sub(r"\s*```$", "", clean).strip()
+                        return json.loads(clean)
             except Exception as ex:
                 logger.debug(f"Gemini evaluate attempt failed on {m}: {ex}")
                 continue
@@ -1926,42 +1967,73 @@ def judge_voice_with_llm(spoken_answer: str, question: Optional[dict]) -> dict:
     }
 
 def manage_site_deck(action: str, name: Optional[str] = None, deck_id: Optional[str] = None, description: Optional[str] = None, tags: Optional[list] = None, sort_by: Optional[str] = None) -> dict:
-    """Agent tool to create, list, delete, or sort decks on the Noledge platform."""
+    """Agent tool: return a frontend-executable site_action payload (no fake success).
+
+    The Python worker has no DOM access; the Next.js client executes via executeSiteAction().
+    Callers MUST forward via LiveKit data channel type=site_action.
+    """
+    act = (action or "").strip().lower()
+    # Canonicalize aliases to executeSiteAction verbs.
+    alias_map = {
+        "create": "create_deck", "new": "create_deck", "add_deck": "create_deck",
+        "remove": "delete_deck", "delete": "delete_deck",
+        "list": "get_decks", "get": "get_decks", "show": "get_decks",
+        "sort": "sort_deck",
+    }
+    canonical = alias_map.get(act, act)
+    if canonical not in ("create_deck", "delete_deck", "get_decks", "sort_deck"):
+        return {"status": "error", "message": f"Unknown deck action '{action}'. Supported: create_deck, delete_deck, get_decks, sort_deck."}
+    if canonical == "create_deck" and not (name or "").strip():
+        return {"status": "error", "message": "Deck name is required to create a deck."}
+    if canonical in ("delete_deck", "sort_deck") and not (deck_id or "").strip():
+        return {"status": "error", "message": "deck_id is required for this deck action."}
     return {
         "status": "success",
-        "action": action,
-        "deck_id": deck_id,
-        "name": name,
-        "description": description,
-        "tags": tags or [],
-        "sort_by": sort_by,
-        "message": f"Site action '{action}' queued for execution on platform."
+        "action": "site_action",
+        "site_action": canonical,
+        "params": {"name": name, "deck_id": deck_id, "description": description, "tags": tags or [], "sort_by": sort_by},
+        "message": f"Deck action '{canonical}' ready for client execution."
     }
 
 def manage_site_question(action: str, deck_id: Optional[str] = None, question_id: Optional[str] = None, type: Optional[str] = None, content: Optional[str] = None, answer: Optional[Any] = None, explanation: Optional[str] = None, options: Optional[list] = None, code_language: Optional[str] = None, new_type: Optional[str] = None, target_deck_id: Optional[str] = None) -> dict:
-    """Agent tool to add, edit, delete, move, or convert flashcard questions across all 10 question types."""
+    """Agent tool: return a frontend-executable site_action payload for all 10 question types."""
+    act = (action or "").strip().lower()
+    alias_map = {
+        "create": "add_question", "add": "add_question", "new": "add_question",
+        "update": "edit_question", "edit": "edit_question",
+        "remove": "delete_question", "delete": "delete_question",
+        "move": "move_question", "convert": "change_question_type", "change_type": "change_question_type",
+    }
+    canonical = alias_map.get(act, act)
+    if canonical not in ("add_question", "edit_question", "delete_question", "move_question", "change_question_type"):
+        return {"status": "error", "message": f"Unknown question action '{action}'. Supported: add/edit/delete/move/change_question_type."}
     return {
         "status": "success",
-        "action": action,
-        "question_id": question_id,
-        "deck_id": deck_id,
-        "type": type or new_type,
-        "content": content,
-        "answer": answer,
-        "explanation": explanation,
-        "options": options,
-        "code_language": code_language,
-        "target_deck_id": target_deck_id,
-        "message": f"Question action '{action}' queued for execution on platform."
+        "action": "site_action",
+        "site_action": canonical,
+        "params": {"deck_id": deck_id, "id": question_id, "type": type or new_type, "new_type": new_type or type,
+                   "content": content, "answer": answer, "explanation": explanation, "options": options,
+                   "code_language": code_language, "target_deck_id": target_deck_id},
+        "message": f"Question action '{canonical}' ready for client execution."
     }
 
 def control_site_app(action: str, path: Optional[str] = None, theme: Optional[str] = None) -> dict:
-    """Agent tool to navigate pages/tests or toggle Light/Dark theme."""
+    """Agent tool: return a frontend-executable site_action payload for navigation/theme."""
+    act = (action or "").strip().lower()
+    alias_map = {"navigate": "navigate_to", "go": "navigate_to", "open": "navigate_to",
+                 "theme": "change_theme", "toggle_theme": "change_theme"}
+    canonical = alias_map.get(act, act)
+    if canonical not in ("navigate_to", "change_theme"):
+        return {"status": "error", "message": f"Unknown app action '{action}'. Supported: navigate_to, change_theme."}
+    if canonical == "navigate_to" and path not in ("/", "/study", "/manage", "/create", "/settings"):
+        return {"status": "error", "message": f"Refused unsafe navigation to '{path}'. Allowed: /, /study, /manage, /create, /settings."}
+    if canonical == "change_theme" and (theme or "").lower() not in ("light", "dark"):
+        return {"status": "error", "message": "Theme must be 'light' or 'dark'."}
     return {
         "status": "success",
-        "action": action,
-        "path": path,
-        "theme": theme,
-        "message": f"App control '{action}' queued for execution."
+        "action": "site_action",
+        "site_action": canonical,
+        "params": {"path": path, "theme": theme},
+        "message": f"App control '{canonical}' ready for client execution."
     }
 

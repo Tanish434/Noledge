@@ -268,17 +268,20 @@ export interface CodeEvaluationResult {
 
 export async function judgeCodeSnippet(question: Question, code: string): Promise<CodeEvaluationResult> {
   try {
+    // Canonical payload matches /api/agent/judge-code JudgeCodePayload {code, question}.
     const res = await fetch('/api/agent/judge-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        question_id: question.id,
-        question_content: question.content,
         code,
-        expected_answer: question.answer,
-        explanation: question.explanation,
-        hints: question.hints,
-        language: question.code_language || 'python',
+        question: {
+          id: question.id,
+          type: question.type,
+          content: question.content,
+          answer: question.answer,
+          explanation: question.explanation,
+          code_language: question.code_language || 'python',
+        },
       }),
     });
 

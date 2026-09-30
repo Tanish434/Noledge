@@ -2,9 +2,29 @@ import fs from 'fs';
 import path from 'path';
 
 let cachedAgentEnv: Record<string, string> | null = null;
+let cachedAtMs = 0;
+let cachedFileMtimeMs = 0;
+
+function getEnvFilesMtime(): number {
+  try {
+    let m = 0;
+    for (const rel of ['agent/.env', 'agent/.env.local']) {
+      const p = path.join(process.cwd(), rel);
+      if (fs.existsSync(p)) {
+        const st = fs.statSync(p).mtimeMs;
+        if (st > m) m = st;
+      }
+    }
+    return m;
+  } catch {
+    return 0;
+  }
+}
 
 export function getAgentEnv(): Record<string, string> {
-  if (cachedAgentEnv) return cachedAgentEnv;
+  const mtime = getEnvFilesMtime();
+  // Invalidate when .env files change (API key added at runtime) or after 30s staleness.
+  if (cachedAgentEnv && mtime <= cachedFileMtimeMs && Date.now() - cachedAtMs < 30000) return cachedAgentEnv;
 
   const envVars: Record<string, string> = {};
 
@@ -54,6 +74,8 @@ export function getAgentEnv(): Record<string, string> {
   }
 
   cachedAgentEnv = envVars;
+  cachedAtMs = Date.now();
+  cachedFileMtimeMs = mtime;
   return envVars;
 }
 

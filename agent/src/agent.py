@@ -107,17 +107,22 @@ class GeminiLLMStream(llm.LLMStream):
         if active_verified is None:
             active_verified = True
 
-        # 1. Load full persistent session history from SQLite DB (including all uploaded files, certificates, OCR findings)
+        # 1. Load persistent session history from SQLite DB (bounded to last 30 msgs to cap latency).
         seen_entries = set()
         if active_sid:
             try:
                 db_msgs = await asyncio.to_thread(history.get_session_messages, active_sid)
+                # Bound context: last 30 messages max, each truncated to 2000 chars.
+                if len(db_msgs) > 30:
+                    db_msgs = db_msgs[-30:]
                 for dm in db_msgs:
                     d_role = dm.get("role", "user")
                     d_speaker = dm.get("speaker") or ("Kirito" if d_role == "user" else "aliph1")
                     d_text = (dm.get("content") or "").strip()
                     if not d_text:
                         continue
+                    if len(d_text) > 2000:
+                        d_text = d_text[:2000] + "… [truncated]"
                     role_key = "user" if d_role == "user" else "model"
                     if role_key == "user":
                         d_spk_str = str(d_speaker).strip()
@@ -270,43 +275,13 @@ CORE GUIDELINES:
    - Managing API Keys: When the user provides an API key or asks to add/manage an API key (e.g. for Cartesia, ElevenLabs, Gemini, Speechmatics, or LiveKit), call `manage_api_keys(action="add", service="cartesia", api_key="...")` immediately to save it to their multi-account pool and persist it in .env.
    - System Settings, STT, TTS, & Voice Management:
      When asked about current settings, active voice, or what engines are active, call `get_system_settings()`.
-     When the user asks you to change the voice (e.g. "Use Rachel's voice", "Switch to Sarah", "Use Casper"), switch the STT engine ('livekit', 'speechmatics', 'cartesia', 'elevenlabs'), switch the TTS engine ('cartesia', 'elevenlabs', 'livekit'), switch the LLM model, or toggle OCR, call `modify_system_settings(stt="...", tts="...", voice="...", llm="...", enable_ocr=...)` immediately.
+      When the user asks you to change the voice (e.g. "Use Rachel's voice", "Switch to Sarah", "Use Casper"), switch the STT engine ('livekit', 'speechmatics', 'elevenlabs', 'google', 'browser'), switch the TTS engine ('cartesia', 'elevenlabs', 'livekit', 'google', 'browser'), switch the LLM model, or toggle OCR, call `modify_system_settings(stt="...", tts="...", voice="...", llm="...", enable_ocr=...)` immediately.
    Always confirm the memory action clearly and warmly to the user once completed.
-5. 3D Orb Visual Shaders (Orbkit Styles):
-   The central visual 3D Orb has 33 procedural and raymarched WebGL shader styles. Use their exact concise 2-3 word names and codes when speaking about or switching them:
-   - SHDR-01: Prism Crystal (cut-glass crystal orb with dispersive turbulent interior)
-   - SHDR-02: Scrollwork Dome (ornate gold scrollwork dome)
-   - SHDR-03: Rainbow Belt (turbulent rainbow light belt)
-   - SHDR-04: Voxel Lattice (faceted voxel lattice shell)
-   - SHDR-05: Chromatic Lenses (rainbow rings through lens lattice)
-   - SHDR-06: Interference Lattice (stack of interfering glowing lattices)
-   - SHDR-07: Twist Column (twist wave around a central column)
-   - SHDR-08: Pearl Contours (mother-of-pearl layered contour bands)
-   - SHDR-09: Latitude Rings (torn rainbow rings around latitudes)
-   - SHDR-10: Knit Light (knitted lattice skin of light)
-   - SHDR-11: Quantum Chroma (quantum orbital with rainbow chroma)
-   - SHDR-12: Toy Bricks (glossy Lego-like toy bricks sphere)
-   - SHDR-13: Plasma Globe (plasma globe with crawling lightning filaments)
-   - SHDR-14: Pixel Plasma (two-tone quantized pixel plasma dome)
-   - SHDR-15: Particle Track (iridescent particle-track web skin)
-   - SHDR-16: Water Caustics (sunlight caustic net crawling over water)
-   - SHDR-17: Electric Storm (grainy colored storm with lightning shear)
-   - SHDR-18: Folded Crystal (crystal folded from an octant of space)
-   - SHDR-19: Cellular Beads (swelling and shrinking packed cellular beads)
-   - SHDR-20: Fountain Film (rushing water film down a fountain sphere)
-   - SHDR-21: Cloud Diffusion (diffuse light scattered through clouds)
-   - SHDR-22: Magnetic Field (swirling magnetic field lines)
-   - SHDR-23: CRT Matrix (classic CRT green ASCII glyph matrix)
-   - SHDR-24: Voxel Earth (Minecraft-style voxel sphere with cycling seasons)
-   - SHDR-25: Warped Field (steep topological folds of a warped field)
-   - SHDR-26: Thread Web (crazed web of colored threads on grid)
-   - SHDR-27: Radar Mosaic (weather-radar mosaic sweeping the sphere)
-   - SHDR-28: Binary Grid (nested binary bits shuttering on sphere)
-   - SHDR-29: LED Wall (LED tile wall with flowing light blobs)
-   - SHDR-30: Vanishing Meadow (meadow folding towards blue vanishing point)
-   - SHDR-31: Volumetric Rays (volumetric godrays raymarched shell)
-   - SHDR-32: Galactic Core (spiral galaxy marched as gas and dust)
-7. Full Session Recall & Multimodal Document Awareness:
+ 5. 3D Orb Visual Shaders (33 Orbkit Styles, SHDR-01..SHDR-33):
+    The central 3D Orb has 33 shaders (SHDR-01 Prism Crystal … SHDR-31 Volumetric Rays (user favorite) … SHDR-32 Galactic Core, SHDR-33 Thermal Riso).
+    When the user names any shader, alias, or description (e.g. 'godrays', 'plasma', 'thermal', 'galaxy', 'matrix', 'lego'),
+    call `switch_orb_shader(variant_or_query="<user words>")` and let the resolver fuzzy-match. Do NOT recite the full list unless asked.
+ 7. Full Session Recall & Multimodal Document Awareness:
    - You have 100% immediate access to all past user messages, conversations, and multimodal document/image/video analyses conducted in this session (e.g. certificates, PDFs, diagrams, OCR extractions).
    - When the user asks about an uploaded certificate, document, file, or image, refer directly to the uploaded content and analysis in your conversation history above and answer with complete accuracy, precision, and depth.
    - If the user asks about an asset or topic from a past conversation or earlier session, call `search_chat_history(query="...")` or `read_chat_session(session_id="...")` to retrieve it immediately.
@@ -364,25 +339,36 @@ CORE GUIDELINES:
 
             # --- Shared intent flags (typo tolerant: "sesson", "seession", "thsi" ...) ---
             destructive = any(w in u_clean for w in ["delete", "clear", "wipe", "remove", "reset", "clean", "erase", "purge"])
-            rename_intent = bool(re.search(r'renam', u_clean)) and bool(re.search(r'(?:ses|chat|title|tab\b)', u_clean))
+            # Rename intent: allow pronoun "it/this/that" for multi-action chains like
+            # "delete my previous sessions, make a new session and rename it as X".
+            rename_intent = bool(re.search(r'renam', u_clean)) and bool(
+                re.search(r'(?:ses|chat|title|tab\b|rename\s+(?:it|this|that)\b)', u_clean)
+            )
             new_title = None
             if rename_intent:
                 m_title = re.search(
-                    r'renam\w*\s+(?:the\s+)?(?:this\s+|thsi\s+|ths\s+|current\s+|active\s+)?(?:new\s+)?(?:chat\s+|ses\w+\s*)?(?:title\s+)?(?:name\s+)?(?:to\s+|as\s+)?["\']?(.+?)["\']?[.?!]*$',
+                    r'renam\w*\s+(?:the\s+)?(?:this\s+|thsi\s+|ths\s+|current\s+|active\s+|it\s+)?(?:new\s+)?(?:chat\s+|ses\w+\s*)?(?:title\s+)?(?:name\s+)?(?:to\s+|as\s+)?["\']?(.+?)["\']?[.?!]*$',
                     u_clean
                 )
                 if m_title:
                     cand = m_title.group(1).strip().strip('"\'')
-                    cand = re.sub(r'^(?:this\s+|thsi\s+|ths\s+|current\s+|active\s+|new\s+|chat\s+|ses\w+\s+)+(?:to\s+|as\s+)?', '', cand).strip()
+                    cand = re.sub(r'^(?:this\s+|thsi\s+|ths\s+|current\s+|active\s+|new\s+|chat\s+|ses\w+\s+|it\s+)+(?:to\s+|as\s+)?', '', cand).strip()
                     cand = re.sub(r'[.?!]+$', '', cand).strip()
                     vague = cand.lower() in ("it", "that", "this", "session", "chat", "the session", "something", "anything", "something else", "else", "")
                     if cand and not vague:
                         new_title = cand
                     elif cand and vague:
                         new_title = f"Chat {time.strftime('%b %d, %I:%M %p')}"
+                # Fallback: "rename it as X" where regex above captured "it as X" -> extract after to/as.
+                if not new_title:
+                    m2 = re.search(r'renam\w*.*? (?:to|as)\s+["\']?(.+?)["\']?[.?!]*$', u_clean)
+                    if m2:
+                        cand2 = m2.group(1).strip().strip('"\'')
+                        if cand2 and cand2.lower() not in ("it", "that", "this", "else", "something else"):
+                            new_title = cand2
 
-            # 0. Combined: Switch to a new chat AND delete/clear all sessions
-            if ("new chat" in u_clean or "switch to a new" in u_clean) and any(w in u_clean for w in ["delete", "clear", "wipe", "remove"]):
+            # 0. Combined: Switch to a new chat AND delete/clear all sessions (triple: + rename if requested)
+            if ("new chat" in u_clean or "new session" in u_clean or "switch to a new" in u_clean) and any(w in u_clean for w in ["delete", "clear", "wipe", "remove"]):
                 res = await asyncio.to_thread(execute_gemini_tool, "clear_chat_history", {}, user_id=user_name, current_session_id=curr_sid)
                 new_s = res.get("new_session_id")
                 if room and room.local_participant and new_s:
@@ -391,6 +377,20 @@ CORE GUIDELINES:
                         self._llm._session_state["id"] = new_s
                     p = json.dumps({"type": "history_cleared", "new_session_id": new_s})
                     asyncio.create_task(room.local_participant.publish_data(p.encode()))
+                if rename_intent and new_title:
+                    ren_res = await asyncio.to_thread(
+                        execute_gemini_tool, "rename_chat_session",
+                        {"new_title": new_title, "session_id": new_s or curr_sid},
+                        user_id=user_name, current_session_id=new_s or curr_sid
+                    )
+                    if room and room.local_participant and ren_res.get("action") == "rename_session":
+                        p = json.dumps({
+                            "type": "session_renamed",
+                            "session_id": ren_res.get("session_id") or new_s,
+                            "new_title": ren_res.get("new_title") or new_title
+                        })
+                        asyncio.create_task(room.local_participant.publish_data(p.encode()))
+                    return f"I deleted all your past chat sessions, started a fresh one, and renamed it to '{new_title}'."
                 return "I have deleted all your past chat sessions and switched you to a fresh new chat."
 
             # 1. Switch / Open / Start / Create new chat session
@@ -407,7 +407,8 @@ CORE GUIDELINES:
 
             # 1b. Clear / Delete all chat history & sessions (typo tolerant: sessiions/sesseions/sesson/history)
             #     COMBINED ACTIONS: if the user ALSO asked to rename the (new) session, do BOTH in sequence.
-            if re.search(r'(?:delete|clear|wipe|remove|clean|reset|erase|purge)\s+(?:all\s+|every(?:thing)?\s+|my\s+)*(?:the\s+)?(?:chat\s+)?(?:his\w+|ses+\w*)', u_clean) or (
+            #     Matches "delete my previous sessions", "delete all sessions", "clear history", etc.
+            if re.search(r'(?:delete|clear|wipe|remove|clean|reset|erase|purge)\s+(?:all\s+|every(?:thing)?\s+|my\s+|previous\s+|past\s+|old\s+)*(?:the\s+)?(?:chat\s+)?(?:his\w+|ses+\w*)', u_clean) or (
                 destructive and re.search(r'(?:ses|his|chat)', u_clean) and not any(w in u_clean for w in ["this ", "current ", "thsi ", "ths "])
             ):
                 res = await asyncio.to_thread(execute_gemini_tool, "clear_chat_history", {}, user_id=user_name, current_session_id=curr_sid)
@@ -876,10 +877,18 @@ CORE GUIDELINES:
                             "direction": tool_res.get("direction")
                         })
                         asyncio.create_task(room.local_participant.publish_data(p.encode()))
+                    elif act == "site_action":
+                        # Forward website controls to Next.js client (executeSiteAction).
+                        p = json.dumps({
+                            "type": "site_action",
+                            "action": tool_res.get("site_action"),
+                            "params": tool_res.get("params", {})
+                        })
+                        asyncio.create_task(room.local_participant.publish_data(p.encode()))
                 except Exception as e:
                     logger.warning(f"Error publishing tool action to room data channel: {e}")
 
-            if (act in ("clear_history", "delete_session", "switch_shader", "switch_engine", "enroll_speaker", "rename_speaker", "set_user_name", "delete_speaker", "clear_long_term_memory", "rename_session") or function_call_detected in ("save_to_long_term_memory", "rename_chat_session", "delete_long_term_memory", "update_long_term_memory")) and last_tool_msg:
+            if (act in ("clear_history", "delete_session", "switch_shader", "switch_engine", "enroll_speaker", "rename_speaker", "set_user_name", "delete_speaker", "clear_long_term_memory", "rename_session", "site_action") or function_call_detected in ("save_to_long_term_memory", "rename_chat_session", "delete_long_term_memory", "update_long_term_memory", "manage_site_deck", "manage_site_question", "control_site_app")) and last_tool_msg:
                 full_reply_text = last_tool_msg
                 for spoken_part in speech_filter.push(last_tool_msg):
                     self._event_ch.send_nowait(
@@ -1012,7 +1021,7 @@ CORE GUIDELINES:
 
 
 class GeminiLLM(llm.LLM):
-    def __init__(self, api_key: str = "", model: str = "gemini-2.0-flash", current_user: str = "Kirito", room: Optional[rtc.Room] = None, current_session_id: Optional[str] = None, session_state: Optional[Dict[str, Any]] = None):
+    def __init__(self, api_key: str = "", model: str = "gemini-3.5-flash-lite", current_user: str = "Kirito", room: Optional[rtc.Room] = None, current_session_id: Optional[str] = None, session_state: Optional[Dict[str, Any]] = None):
         super().__init__()
         self._api_key = api_key
         self._model = model
@@ -1257,11 +1266,9 @@ async def my_agent(ctx: JobContext):
         logger.info(f"🔄 [Agent State Changed]: {state_str}")
         asyncio.create_task(broadcast_state(state_str))
 
-        # Immediately emit assistant message when speaking starts if text is already generated
-        if state_str == "speaking":
-            pending_text = getattr(llm_inst, "_pending_reply_text", "").strip()
-            if pending_text:
-                emit_assistant_message(pending_text)
+        # NOTE: Do NOT emit assistant text here. The single source of truth is
+        # conversation_item_added -> emit_assistant_message (with 2s idempotent dedup).
+        # Emitting _pending_reply_text here caused duplicate chat bubbles.
 
     @session.on("user_state_changed")
     def on_user_state_changed(event):
@@ -1658,12 +1665,23 @@ async def my_agent(ctx: JobContext):
                     session.interrupt(force=True)
                 except Exception:
                     pass
-                new_stt_inst = get_stt(prewarmed_vad=prewarmed_vad)
-                new_tts_inst = get_tts()
-                session._stt = new_stt_inst
-                session._tts = new_tts_inst
-                if new_llm and getattr(session, "_llm", None) is not None:
-                    setattr(session._llm, "_model", new_llm)
+                try:
+                    new_stt_inst = get_stt(prewarmed_vad=prewarmed_vad)
+                    new_tts_inst = get_tts()
+                    # LiveKit Agents has no public hot-swap API; private assignment is the
+                    # documented workaround. Guard so a future SDK rename degrades to restart notice.
+                    try:
+                        session._stt = new_stt_inst  # type: ignore[attr-defined]
+                        session._tts = new_tts_inst  # type: ignore[attr-defined]
+                    except Exception as priv_err:
+                        logger.warning(f"Hot-swap STT/TTS via private fields failed ({priv_err}); restart worker to apply.")
+                    if new_llm and getattr(session, "_llm", None) is not None:
+                        try:
+                            setattr(session._llm, "_model", new_llm)
+                        except Exception:
+                            pass
+                except Exception as eng_err:
+                    logger.warning(f"Engine rebuild failed, keeping previous engines: {eng_err}")
                 logger.info(f"Engines switched: STT={new_stt}, TTS={new_tts}, Voice={new_voice}, LLM={new_llm}")
                 asyncio.create_task(broadcast_engines())
 

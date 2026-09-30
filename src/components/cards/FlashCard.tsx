@@ -52,7 +52,7 @@ function formatCorrectAnswer(question: Question): string {
     }
 
     const inlineMatches = Array.from(question.content.matchAll(/\{\{(.*?)\}\}/g));
-    if (inlineMatches.length > 1 && inlineMatches.length > list.length) {
+    if (inlineMatches.length >= 1 && inlineMatches.length > list.length) {
       list = inlineMatches.map((m, idx) => {
         const val = m[1].trim();
         const accs = val ? val.split(/[/|,]/).map((s) => s.trim()).filter(Boolean) : [];

@@ -47,10 +47,16 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 @app.route("/")
 def index():
     from flask import redirect
-    return redirect("http://localhost:3000/", code=302)
+    import os as _os
+    target = _os.getenv("NEXT_PUBLIC_APP_URL", "http://localhost:3000/").rstrip("/") + "/"
+    return redirect(target, code=302)
 
 @app.route("/<path:path>")
 def static_proxy(path):
+    # Never shadow API, token, share, or history routes with the static file handler.
+    if path.startswith(("api/", "getToken", "share/")):
+        from flask import abort
+        return abort(404)
     resp = send_from_directory(WEB_DIR, path)
     if path.endswith((".js", ".mjs")):
         resp.headers["Content-Type"] = "application/javascript"
@@ -112,7 +118,7 @@ def get_engines():
             "id": "livekit",
             "name": "LiveKit Cloud STT",
             "badge": "⭐ Deepgram Nova-3 (English)",
-            "desc": "Real-time English speech recognition (<150ms latency)",
+            "desc": "Real-time English speech recognition (<150ms latency, Sep-2026 fastest streaming)",
             "available": True
         },
         {
@@ -125,38 +131,38 @@ def get_engines():
         {
             "id": "google",
             "name": "Google Cloud STT",
-            "badge": "⚡ Google Speech (English)",
+            "badge": "⚡ Google Speech (en-US)",
             "desc": "Google Cloud real-time English speech recognition",
             "available": True
         },
         {
-            "id": "cartesia",
-            "name": "Cartesia Listen STT",
-            "badge": "⚡ Cartesia Listen (English)",
-            "desc": "Ultra-low latency English speech transcription",
-            "available": is_cartesia_quota_available()
-        },
-        {
             "id": "elevenlabs",
             "name": "ElevenLabs Scribe",
-            "badge": "🎙️ Scribe (English)",
-            "desc": "High-accuracy English speech-to-text",
+            "badge": "🎙️ Scribe v2 Realtime (English)",
+            "desc": "High-accuracy English speech-to-text (~123ms first partial, Sep-2026)",
             "available": is_elevenlabs_quota_available()
+        },
+        {
+            "id": "browser",
+            "name": "Browser Web Speech API",
+            "badge": "🌐 Native (Chrome/Edge)",
+            "desc": "On-device browser recognition fallback, no server needed",
+            "available": True
         }
     ]
     tts_options = [
         {
             "id": "cartesia",
-            "name": "Cartesia Sonic-3",
+            "name": "Cartesia Sonic-3.5",
             "badge": "⚡ Cartesia Sarah (English)",
-            "desc": "Ultra-low latency (<90ms) conversational natural English tone",
+            "desc": "Ultra-low latency (<90ms) conversational natural English tone (Sep-2026 current)",
             "available": is_cartesia_quota_available()
         },
         {
             "id": "elevenlabs",
-            "name": "ElevenLabs Turbo v2.5",
+            "name": "ElevenLabs Turbo v2.5 / v4 Turbo",
             "badge": "🎙️ ElevenLabs Rachel (English)",
-            "desc": "Studio-quality expressive English voice",
+            "desc": "Studio-quality expressive English voice (v4 Turbo Sep-28-2026, ~150ms)",
             "available": is_elevenlabs_quota_available()
         },
         {
@@ -171,6 +177,13 @@ def get_engines():
             "name": "LiveKit Cloud TTS",
             "badge": "⭐ LiveKit Voice (English)",
             "desc": "Real-time cloud voice synthesis with zero-lag streaming",
+            "available": True
+        },
+        {
+            "id": "browser",
+            "name": "Browser SpeechSynthesis",
+            "badge": "🌐 Local (Offline fallback)",
+            "desc": "On-device browser speech synthesis, works offline",
             "available": True
         }
     ]
@@ -220,7 +233,7 @@ def get_engines():
         "voice_options": VOICE_REGISTRIES,
         "llm_options": llm_options,
         "model_details": {
-            "active_model": cfg.get("selected_llm", "gemini-2.0-flash"),
+            "active_model": cfg.get("selected_llm", "gemini-3.5-flash-lite"),
             "capabilities": [
                 "Native PDF OCR & Comprehension (up to 1,000 pages)",
                 "High-Resolution Visual Image & Diagram OCR",

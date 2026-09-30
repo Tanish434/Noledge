@@ -56,10 +56,11 @@ function getAllGeminiKeys(): string[] {
 }
 
 // Full Gemini Function Declarations matching site capabilities and memory.py
+// Canonical: single source includes history, decks, questions, app controls.
 const GEMINI_FUNCTION_DECLARATIONS = [
   {
     name: 'clear_chat_history',
-    description: 'Permanently delete, wipe, and clear all past conversation sessions from history. Use this whenever the user asks to delete past sessions, delete all chats, clear history, or wipe sessions.',
+    description: 'Permanently delete, wipe, and clear all past conversation sessions from history. ONLY for explicit delete-all/clear-all/wipe-all requests. NEVER for rename.',
     parameters: {
       type: 'OBJECT',
       properties: {},
@@ -73,6 +74,26 @@ const GEMINI_FUNCTION_DECLARATIONS = [
       properties: {
         session_id: { type: 'STRING', description: 'Session ID to delete. If omitted, deletes the active session.' },
       },
+    },
+  },
+  {
+    name: 'rename_chat_session',
+    description: 'Rename a chat session title. Use for ANY rename request incl. "rename it as X". NEVER delete for rename.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        new_title: { type: 'STRING', description: 'New title.' },
+        session_id: { type: 'STRING', description: 'Session ID (optional, defaults to active).' },
+      },
+      required: ['new_title'],
+    },
+  },
+  {
+    name: 'create_new_chat_session',
+    description: 'Start a brand new clean chat session. Use when user asks for new chat/fresh discussion.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {},
     },
   },
   {
@@ -222,16 +243,61 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ── 1. FAST-PATH: Clear / Delete Past Sessions Tool ───────────────────
+    // ── 1. FAST-PATH: Clear / Delete Past Sessions Tool (atomic multi-action aware) ──
+    // Require plural/all/past/previous scope to avoid matching "delete this history item".
     const isClearAllHistory =
-      /(?:delete|clear|wipe|remove|clean|reset)\s+(?:all\s+)?(?:the\s+)?(?:chat\s+)?(?:history|sess?i+ons?)/i.test(lower) ||
-      (lower.includes('delete') && (lower.includes('history') || lower.includes('session') || lower.includes('chat')));
+      /(?:delete|clear|wipe|remove|clean|reset|erase|purge)\s+(?:all\s+|every(?:thing)?\s+|my\s+|previous\s+|past\s+|old\s+)*(?:the\s+)?(?:chat\s+)?(?:history|sess?i+ons?)/i.test(lower) &&
+      !/(?:this|current|thsi|ths)\s+(?:chat|sess?i+on)/i.test(lower);
 
-    if (isClearAllHistory && !lower.includes('this session') && !lower.includes('current session')) {
+    // Detect rename intent incl. pronoun "rename it as X" for triple chains.
+    const renameMatch =
+      lower.match(/renam\w*.*? (?:to|as)\s+["']?(.+?)["']?[.?!]*$/) ||
+      lower.match(/renam\w*\s+(?:the\s+)?(?:new\s+)?(?:chat|sess\w+|title|it|this|that)?\s*(?:to|as)?\s*["']?(.+?)["']?[.?!]*$/);
+    let renameTitle: string | null = null;
+    if (/renam/i.test(lower)) {
+      const candRaw = (renameMatch?.[1] || '').trim().replace(/^["']|["']$/g, '');
+      const cand = candRaw.replace(/^(?:this|thsi|ths|current|active|new|chat|sess\w+|it|title|name)\s+(?:to\s+|as\s+)?/i, '').trim();
+      if (cand && !['it', 'that', 'this', 'else', 'something else', 'session', 'chat'].includes(cand.toLowerCase())) {
+        renameTitle = candRaw;
+      }
+    }
+    const wantsNewChat = /(?:new\s+chat|new\s+session|switch\s+to\s+a\s+new|open\s+new\s+chat|start\s+new\s+chat)/i.test(lower);
+
+    if (isClearAllHistory) {
+      // Triple: delete-all + new + rename -> return combined actions so client executes all.
+      if (renameTitle) {
+        return NextResponse.json({
+          success: true,
+          action: 'clear_chat_history',
+          actions: [
+            { action: 'clear_chat_history', params: {} },
+            { action: 'rename_chat_session', params: { new_title: renameTitle, session_id } },
+          ],
+          params: { new_title: renameTitle },
+          text: `🧹 All past sessions cleared, fresh chat started and renamed to '${renameTitle}'.`,
+        });
+      }
+      if (wantsNewChat) {
+        return NextResponse.json({
+          success: true,
+          action: 'clear_chat_history',
+          text: '🧹 All past conversation sessions have been permanently cleared. Starting a fresh session!',
+        });
+      }
       return NextResponse.json({
         success: true,
         action: 'clear_chat_history',
         text: '🧹 All past conversation sessions have been permanently cleared. Starting a fresh session!',
+      });
+    }
+
+    // Rename-only fast-path (no destructive scope).
+    if (/renam/i.test(lower) && renameTitle && !isClearAllHistory) {
+      return NextResponse.json({
+        success: true,
+        action: 'rename_chat_session',
+        params: { new_title: renameTitle, session_id },
+        text: `✏️ Renamed this chat to '${renameTitle}'.`,
       });
     }
 
@@ -441,11 +507,11 @@ export async function POST(req: NextRequest) {
     const modelsToTry = [
       'gemini-3.5-flash-lite',
       'gemini-3.5-flash',
-      'gemini-flash-latest',
-      'gemini-pro-latest',
     ];
 
-    for (const key of apiKeys) {
+    // Only try first 2 keys to bound latency (each attempt 8s max).
+    const keysToTry = apiKeys.slice(0, 2);
+    for (const key of keysToTry) {
       for (const model of modelsToTry) {
         try {
           const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
@@ -467,7 +533,7 @@ export async function POST(req: NextRequest) {
                 maxOutputTokens: 1024,
               },
             }),
-            signal: AbortSignal.timeout(12000),
+            signal: AbortSignal.timeout(8000),
           });
 
           if (gRes.ok) {
@@ -533,16 +599,17 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 7. Graceful Fallback if offline/all keys rate-limited ────────────
-    let fallbackText = `Hello **${user_name}**! `;
+    // NOTE: This is an offline template, not a canned answer. It echoes the live question context.
+    let fallbackText = `⚠️ **Offline mode** (AI keys unreachable) — Hello **${user_name}**, you asked: "${trimmedMsg.slice(0, 120)}"\n\n`;
     if (context.question) {
-      fallbackText += `Regarding this **${context.question.type.toUpperCase()}** question:\n\n> ${context.question.content}\n\n`;
+      fallbackText += `Regarding this live **${context.question.type.toUpperCase()}** card:\n\n> ${String(context.question.content || '').slice(0, 400)}\n\n`;
       if (context.question.explanation) {
         fallbackText += `💡 **Key Insight:** ${context.question.explanation}`;
       } else {
-        fallbackText += `Think about the core concepts related to this card. You can also use voice to answer, or ask me to check your code.`;
+        fallbackText += `Check your Gemini API keys in Settings, then retry for full AI reasoning.`;
       }
     } else {
-      fallbackText += `I'm ready to assist you on **${context.path === '/study' ? 'Study Mode' : context.path === '/manage' ? 'Deck Manager' : context.path === '/create' ? 'Deck Creator' : 'Dashboard'}**. You can ask questions, manage your decks, change themes, or upload files!`;
+      fallbackText += `I'm on **${context.path === '/study' ? 'Study Mode' : context.path === '/manage' ? 'Deck Manager' : context.path === '/create' ? 'Deck Creator' : 'Dashboard'}** but offline. Reconnect and ask again for full answers.`;
     }
 
     return NextResponse.json({

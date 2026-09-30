@@ -338,14 +338,31 @@ export default function CardStack({ className, isGlobalTest }: CardStackProps) {
     if (!activeSession.finished_at && currentCardIndex >= activeSession.question_ids.length) {
       void useQuestionStore.getState().endSession();
     }
+    const targetId = activeSession.question_ids[currentCardIndex];
+    const handleSkipMissing = () => {
+      // Card object missing from IndexedDB (deleted/out-of-sync): skip instead of infinite loader.
+      if (targetId) {
+        const ids = useQuestionStore.getState().activeSession?.question_ids || [];
+        if (ids.length <= 1) {
+          void useQuestionStore.getState().endSession();
+        } else {
+          useQuestionStore.getState().nextCard();
+        }
+      }
+    };
     return (
       <div className={cn(styles.cardStack, className)}>
         <div className={styles.stackContainer}>
-          <div className={styles.cardLayer} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, padding: 32 }}>
-            <RefreshCw size={24} style={{ color: 'var(--color-accent)', animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+          <div className={styles.cardLayer} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320, padding: 32, gap: 12 }}>
+            <RefreshCw size={24} style={{ color: 'var(--color-accent)', animation: 'spin 1s linear infinite', marginBottom: 4 }} />
             <p style={{ fontSize: 14, fontFamily: 'var(--font-mono)', color: 'var(--color-text-secondary)' }}>
               Loading card {currentCardIndex + 1} of {activeSession.total_cards}…
             </p>
+            {!isBuffering && targetId && (
+              <button type="button" className="btn btn-ghost btn-sm" onClick={handleSkipMissing}>
+                Card unavailable — skip
+              </button>
+            )}
           </div>
         </div>
       </div>

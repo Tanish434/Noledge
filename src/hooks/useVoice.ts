@@ -187,14 +187,17 @@ export function useVoice(language: string = 'en-US'): UseVoiceReturn {
         recognitionRef.current = recognition;
         try {
           recognition.start();
+          // Exclusive: native path owns the mic, do NOT start MediaRecorder in parallel.
           return true;
         } catch (e) {
           log.warn('voice_start_warning', 'Native speech start warning', { error: String(e) });
+          // Fall through to MediaRecorder only if native start failed.
         }
       }
     }
 
-    // MediaRecorder recording fallback (e.g. Firefox)
+    // MediaRecorder fallback ONLY when native unavailable or native start failed (e.g. Firefox).
+    // Prevents dual-mic contention which caused permission errors and empty transcripts.
     if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices
         .getUserMedia({ audio: true })

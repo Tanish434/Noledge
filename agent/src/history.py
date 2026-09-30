@@ -60,19 +60,36 @@ def create_session(title: Optional[str] = None) -> Dict[str, Any]:
         "message_count": 0
     }
 
-def cleanup_empty_sessions():
+def cleanup_empty_sessions(max_age_seconds: float = 3600.0):
+    """Delete only stale empty sessions (older than max_age) to avoid hiding freshly created chats.
+
+    Previous behavior deleted ALL message_count==0 rows on every get_sessions() call,
+    which made newly created sessions invisible until the first message landed.
+    """
+    cutoff = time.time() - max_age_seconds
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM sessions WHERE message_count = 0")
+        cursor.execute(
+            "DELETE FROM sessions WHERE message_count = 0 AND created_at < ?",
+            (cutoff,),
+        )
         conn.commit()
 
 def get_sessions() -> List[Dict[str, Any]]:
     cleanup_empty_sessions()
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, title, created_at, updated_at, message_count FROM sessions WHERE message_count > 0 ORDER BY updated_at DESC")
+        cursor.execute("SELECT id, title, created_at, updated_at, message_count FROM sessions ORDER BY updated_at DESC")
         rows = cursor.fetchall()
         return [dict(r) for r in rows]
+
+def ensure_session(session_id: Optional[str] = None, title: Optional[str] = None) -> Dict[str, Any]:
+    """Return existing session or create a persistent one. Single source of truth for IDs."""
+    if session_id:
+        existing = get_session(session_id)
+        if existing:
+            return existing
+    return create_session(title=title)
 
 def resolve_session(
     identifier: Optional[str] = None,

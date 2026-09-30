@@ -538,7 +538,7 @@ GEMINI_TOOLS = [
             },
             {
                 "name": "modify_system_settings",
-                "description": "Change or update system settings, including switching STT ('livekit', 'speechmatics', 'cartesia', 'elevenlabs', 'google'), switching TTS ('cartesia', 'elevenlabs', 'google', 'livekit'), changing active voice ('sarah', 'rachel', 'casper', 'puck', etc.), changing LLM model ('gemini-2.0-flash', 'gemini-2.0-flash-lite', etc.), or toggling OCR.",
+                "description": "Change or update system settings, including switching STT ('livekit', 'speechmatics', 'elevenlabs', 'google', 'browser'), switching TTS ('cartesia', 'elevenlabs', 'google', 'livekit', 'browser'), changing active voice ('sarah', 'rachel', 'casper', 'puck', etc.), changing LLM model ('gemini-3.5-flash-lite', 'gemini-3.5-flash', etc.), or toggling OCR.",
                 "parameters": {
                     "type": "OBJECT",
                     "properties": {
@@ -556,7 +556,7 @@ GEMINI_TOOLS = [
                         },
                         "llm": {
                             "type": "STRING",
-                            "description": "Optional Gemini LLM model: 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', etc."
+                            "description": "Optional Gemini LLM model: 'gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-lite-latest', etc."
                         },
                         "enable_ocr": {
                             "type": "BOOLEAN",
@@ -720,6 +720,104 @@ GEMINI_TOOLS = [
                     },
                     "required": ["action"]
                 }
+            },
+            {
+                "name": "manage_site_deck",
+                "description": "Create, list, delete, or sort flashcard decks on the Noledge website. Use when the user asks to create/delete/list/sort decks.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {
+                            "type": "STRING",
+                            "description": "Deck action: create_deck, delete_deck, get_decks, sort_deck."
+                        },
+                        "name": {
+                            "type": "STRING",
+                            "description": "Deck name (required for create)."
+                        },
+                        "deck_id": {
+                            "type": "STRING",
+                            "description": "Deck ID or name (required for delete/sort)."
+                        },
+                        "description": {
+                            "type": "STRING",
+                            "description": "Optional deck description."
+                        },
+                        "sort_by": {
+                            "type": "STRING",
+                            "description": "Sort key for sort_deck: difficulty, type, title."
+                        }
+                    },
+                    "required": ["action"]
+                }
+            },
+            {
+                "name": "manage_site_question",
+                "description": "Add, edit, delete, move, or convert flashcard questions across all 10 question types on the website.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {
+                            "type": "STRING",
+                            "description": "Question action: add_question, edit_question, delete_question, move_question, change_question_type."
+                        },
+                        "deck_id": {
+                            "type": "STRING",
+                            "description": "Target deck ID."
+                        },
+                        "question_id": {
+                            "type": "STRING",
+                            "description": "Question ID (for edit/delete/move/convert)."
+                        },
+                        "type": {
+                            "type": "STRING",
+                            "description": "Question type: mcq, tf, multi, typing, voice, image-select, match, fill, order, code."
+                        },
+                        "content": {
+                            "type": "STRING",
+                            "description": "Question prompt text."
+                        },
+                        "answer": {
+                            "type": "STRING",
+                            "description": "Correct answer."
+                        },
+                        "explanation": {
+                            "type": "STRING",
+                            "description": "Explanation."
+                        },
+                        "target_deck_id": {
+                            "type": "STRING",
+                            "description": "Destination deck for move_question."
+                        },
+                        "new_type": {
+                            "type": "STRING",
+                            "description": "New type for change_question_type."
+                        }
+                    },
+                    "required": ["action"]
+                }
+            },
+            {
+                "name": "control_site_app",
+                "description": "Navigate website pages (/study, /manage, /create, /settings) or toggle light/dark theme.",
+                "parameters": {
+                    "type": "OBJECT",
+                    "properties": {
+                        "action": {
+                            "type": "STRING",
+                            "description": "App action: navigate_to or change_theme."
+                        },
+                        "path": {
+                            "type": "STRING",
+                            "description": "Target route: /study, /manage, /create, /settings, /."
+                        },
+                        "theme": {
+                            "type": "STRING",
+                            "description": "Theme: light or dark."
+                        }
+                    },
+                    "required": ["action"]
+                }
             }
         ]
     }
@@ -851,9 +949,14 @@ def execute_gemini_tool(
         }
 
     elif tool_name == "create_new_chat_session":
-        import uuid
-        from datetime import datetime
-        new_sid = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
+        # Persist a real empty session so history never loses the new chat.
+        try:
+            created = history.create_session(title=None)
+            new_sid = created.get("id")
+        except Exception:
+            import uuid
+            from datetime import datetime
+            new_sid = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         return {
             "status": "success",
             "session_id": new_sid,
@@ -880,8 +983,6 @@ def execute_gemini_tool(
         }
 
     elif tool_name == "delete_chat_session":
-        import uuid
-        from datetime import datetime
         sid = (args.get("session_id") or "").strip()
         query = (args.get("query") or "").strip()
         ident = query or sid
@@ -895,7 +996,14 @@ def execute_gemini_tool(
         target_title = target.get("title", target_id)
         ok = history.delete_session(target_id)
         is_current = (target_id == current_session_id)
-        new_sid = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}" if is_current else None
+        new_sid = None
+        if is_current:
+            try:
+                new_sid = history.create_session(title=None).get("id")
+            except Exception:
+                import uuid
+                from datetime import datetime
+                new_sid = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
 
         return {
             "status": "success" if ok else "error",
@@ -908,10 +1016,13 @@ def execute_gemini_tool(
         }
 
     elif tool_name == "clear_chat_history":
-        import uuid
-        from datetime import datetime
         ok = history.clear_all_history()
-        new_sid = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
+        try:
+            new_sid = history.create_session(title=None).get("id")
+        except Exception:
+            import uuid
+            from datetime import datetime
+            new_sid = f"sess_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:4]}"
         return {
             "status": "success" if ok else "error",
             "action": "clear_history",
@@ -1011,7 +1122,7 @@ def execute_gemini_tool(
         v_list = tools.VOICE_REGISTRIES.get(active_tts, [])
         v_name = next((v["name"] for v in v_list if v["id"] == current_voice), current_voice)
         current_stt = cfg.get("selected_stt", "livekit")
-        current_llm = cfg.get("selected_llm", "gemini-2.0-flash")
+        current_llm = cfg.get("selected_llm", "gemini-3.5-flash-lite")
         cur_shader_key = shaders.load_preferences().get("active_shader", "shdr-31")
         cur_shader_name = shaders.SHADERS.get(cur_shader_key, {}).get("name", cur_shader_key)
 
@@ -1193,6 +1304,44 @@ def execute_gemini_tool(
             "direction": act,
             "message": f"Navigating card: {act}"
         }
+
+    # ==========================================
+    # Website Feature Tools (forwarded to Next.js client via site_action)
+    # ==========================================
+    elif tool_name == "manage_site_deck":
+        import tools as _t
+        return _t.manage_site_deck(
+            action=args.get("action", ""),
+            name=args.get("name"),
+            deck_id=args.get("deck_id"),
+            description=args.get("description"),
+            tags=args.get("tags"),
+            sort_by=args.get("sort_by"),
+        )
+
+    elif tool_name == "manage_site_question":
+        import tools as _t
+        return _t.manage_site_question(
+            action=args.get("action", ""),
+            deck_id=args.get("deck_id"),
+            question_id=args.get("question_id"),
+            type=args.get("type"),
+            content=args.get("content"),
+            answer=args.get("answer"),
+            explanation=args.get("explanation"),
+            options=args.get("options"),
+            code_language=args.get("code_language"),
+            new_type=args.get("new_type"),
+            target_deck_id=args.get("target_deck_id"),
+        )
+
+    elif tool_name == "control_site_app":
+        import tools as _t
+        return _t.control_site_app(
+            action=args.get("action", ""),
+            path=args.get("path"),
+            theme=args.get("theme"),
+        )
 
     return {"status": "error", "message": f"Unknown tool: {tool_name}"}
 

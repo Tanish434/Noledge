@@ -57,12 +57,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Empty audio data' }, { status: 400 });
     }
 
-    const apiKeys = getAllGeminiKeys();
+    const apiKeys = getAllGeminiKeys().slice(0, 2);
     const modelsToTry = [
       'gemini-3.5-flash-lite',
-      'gemini-flash-lite-latest',
       'gemini-3.5-flash',
-      'gemini-2.5-flash',
     ];
 
     for (const key of apiKeys) {

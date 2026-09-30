@@ -34,6 +34,33 @@ import { sanitizeHtml, renderMarkdownToHtml } from '@/utils/sanitize';
 import { cn } from '@/utils/cn';
 import styles from './QuestionRenderer.module.css';
 
+// Deterministic stable shuffle (pure, std-lib only): same question.id always yields same order.
+// Fixes biased `sort(() => Math.random()-0.5)` + React purity violations + option-letter jitter.
+function hashSeed(str: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function stableShuffle<T>(arr: T[], seedKey: string): T[] {
+  const out = [...arr];
+  let seed = hashSeed(seedKey || 'q');
+  const rand = () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 // =============================================================================
 // Props
 // =============================================================================
@@ -130,12 +157,12 @@ function MCQQuestion({ question, onAnswer, isActive }: {
   isActive: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const { shuffle_options } = useSettingsStore();
+  const shuffleOptions = useSettingsStore((s) => s.shuffle_options);
 
   const options = React.useMemo(() => {
     const opts = question.options ?? [];
-    return [...opts].sort(() => Math.random() - 0.5);
-  }, [question.id]);
+    return shuffleOptions ? stableShuffle(opts, question.id) : [...opts];
+  }, [question.id, question.options, shuffleOptions]);
 
   const handleSelect = async (option: QuestionOption) => {
     if (!isActive || selected !== null) return;
@@ -182,11 +209,12 @@ function MultiQuestion({ question, onAnswer, isActive }: {
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [submitted, setSubmitted] = useState(false);
+  const shuffleOptions = useSettingsStore((s) => s.shuffle_options);
 
   const options = React.useMemo(() => {
     const opts = question.options ?? [];
-    return [...opts].sort(() => Math.random() - 0.5);
-  }, [question.id]);
+    return shuffleOptions ? stableShuffle(opts, question.id) : [...opts];
+  }, [question.id, question.options, shuffleOptions]);
   const hasSubtextInContent = /select all that apply/i.test(question.content);
 
   const toggleOption = (id: string) => {
@@ -341,16 +369,16 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
   isActive: boolean;
 }) {
   const { voice_language } = useSettingsStore();
-  const { state, transcript, finalTranscript, start, stop, reset, isSupported } = useVoice(voice_language);
+  const { state, transcript, finalTranscript, start, stop, reset, isSupported, error } = useVoice(voice_language);
   const [inputText, setInputText] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [isEvaluating, setIsEvaluating] = useState(false);
 
-  // Synchronize transcript from voice hook
+  // Synchronize transcript from voice hook (guard against loops: only update when different).
   React.useEffect(() => {
     const liveText = finalTranscript || transcript;
     if (liveText) {
-      setInputText(liveText);
+      setInputText((prev) => (prev === liveText ? prev : liveText));
     }
   }, [transcript, finalTranscript]);
 
@@ -373,14 +401,8 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
   const handleMicClick = () => {
     if (submitted) return;
 
-    if (!isSupported) {
-      if (state === 'listening') {
-        stop();
-      } else {
-        start();
-      }
-      return;
-    }
+    // Unsupported browsers fall back to typing (no-op mic, show hint via status text).
+    if (!isSupported) return;
 
     if (state === 'listening') {
       stop();
@@ -416,8 +438,9 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
             state === 'listening' && styles.micPulseActive
           )}
           onClick={handleMicClick}
-          disabled={!isActive || submitted || isEvaluating}
+          disabled={!isActive || submitted || isEvaluating || !isSupported}
           aria-label="Toggle voice recording"
+          title={!isSupported ? 'Voice not supported — type instead' : 'Toggle voice recording'}
         >
           <div className={styles.micIconWrapper}>
             <Mic size={32} strokeWidth={2} />
@@ -425,10 +448,14 @@ function VoiceQuestion({ question, onAnswer, isActive }: {
         </button>
 
         <p className={styles.voiceStatusText}>
-          {state === 'listening'
+          {!isSupported
+            ? 'Voice recognition not supported in this browser — type your answer below (evaluated by AI):'
+            : state === 'listening'
             ? 'Listening to your voice… tap mic when done'
             : state === 'processing'
             ? 'Transcribing your voice with AI…'
+            : state === 'error'
+            ? `Voice error${error ? `: ${error}` : ''} — type your answer below:`
             : 'Tap microphone and speak, or type your answer below:'}
         </p>
 
@@ -491,10 +518,11 @@ function ImageSelectQuestion({ question, onAnswer, isActive }: {
   isActive: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
+  const shuffleOptions = useSettingsStore((s) => s.shuffle_options);
   const options = React.useMemo(() => {
     const opts = question.options ?? [];
-    return [...opts].sort(() => Math.random() - 0.5);
-  }, [question.id]);
+    return shuffleOptions ? stableShuffle(opts, question.id) : [...opts];
+  }, [question.id, question.options, shuffleOptions]);
 
   const handleSelect = async (option: QuestionOption) => {
     if (!isActive || selected !== null) return;
@@ -551,13 +579,13 @@ function MatchQuestion({ question, onAnswer, isActive }: {
   const [submitted, setSubmitted] = useState(false);
 
   const leftItems = React.useMemo(
-    () => [...pairs].sort(() => Math.random() - 0.5),
-    [question.id]
+    () => stableShuffle(pairs, `${question.id}:left`),
+    [question.id, question.pairs, question.answer]
   );
 
   const rightItems = React.useMemo(
-    () => [...pairs].sort(() => Math.random() - 0.5),
-    [question.id]
+    () => stableShuffle(pairs, `${question.id}:right`),
+    [question.id, question.pairs, question.answer]
   );
 
   const leftLabelMap = React.useMemo(() => {
@@ -748,7 +776,7 @@ function FillQuestion({ question, onAnswer, isActive }: {
 
   let blanks = question.blanks && question.blanks.length > 0 ? question.blanks : [];
 
-  if (inlineMatches.length > 1 && inlineMatches.length > blanks.length) {
+  if (inlineMatches.length >= 1 && inlineMatches.length > blanks.length) {
     blanks = inlineMatches.map((m, idx) => {
       const val = m[1].trim();
       const accs = val ? val.split(/[/|,]/).map((s) => s.trim()).filter(Boolean) : [];
@@ -883,8 +911,8 @@ function OrderQuestion({ question, onAnswer, isActive }: {
         : (typeof question.answer === 'string' && question.answer ? question.answer.split(',') : []));
 
   const items = React.useMemo(
-    () => [...rawItems].sort(() => Math.random() - 0.5),
-    [question.id, question.order_items, question.answer] // eslint-disable-line react-hooks/exhaustive-deps
+    () => stableShuffle(rawItems, question.id),
+    [question.id, question.order_items, question.answer]
   );
   const [order, setOrder] = useState<string[]>(items);
   const [submitted, setSubmitted] = useState(false);
@@ -1173,8 +1201,12 @@ function CodeQuestion({ question, onAnswer, isActive }: {
   const [isJudging, setIsJudging] = useState(false);
   const [aiFeedback, setAiFeedback] = useState<{ is_correct: boolean; feedback: string } | null>(null);
 
-  // Debounced real-time code buffer synchronization to Agent context
+  // Debounced real-time code buffer synchronization to Agent context + local cache
+  // (AiTutorDrawer quick-judge reads backend context first, localStorage as fallback.)
   React.useEffect(() => {
+    try {
+      localStorage.setItem(`code_buffer_${question.id}`, value);
+    } catch {}
     const timer = setTimeout(() => {
       void fetch('/api/agent/context', {
         method: 'POST',
@@ -1185,8 +1217,10 @@ function CodeQuestion({ question, onAnswer, isActive }: {
             id: question.id,
             type: question.type,
             content: question.content,
+            options: question.options,
             answer: question.answer,
             explanation: question.explanation,
+            hints: question.hints,
             code_language: question.code_language || 'python',
           },
         }),

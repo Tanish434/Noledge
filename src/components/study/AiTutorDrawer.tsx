@@ -472,16 +472,36 @@ export default function AiTutorDrawer() {
     handleShaderChange(ORB_VARIANT_LIST[prevIndex].key);
   }, [selectedShader, handleShaderChange]);
 
-  // Create or switch to fresh session
+  // Create or switch to fresh session (single source: Python backend, localStorage is cache only)
+  // When called with an existing backend id (e.g. history_cleared event), switch only — no duplicate POST.
   const handleNewChat = useCallback((newSidParam?: string | unknown) => {
-    const newSid = typeof newSidParam === 'string' && newSidParam ? newSidParam : `sess_${Math.floor(Date.now() / 1000)}_${Math.random().toString(36).substring(2, 8)}`;
+    const hasBackendId = typeof newSidParam === 'string' && Boolean(newSidParam);
+    const localSid = hasBackendId ? (newSidParam as string) : `sess_${Math.floor(Date.now() / 1000)}_${Math.random().toString(36).substring(2, 8)}`;
     setMessages([]);
-    setCurrentSessionId(newSid);
+    setCurrentSessionId(localSid);
     try {
-      localStorage.setItem('aliph1_session_id', newSid);
+      localStorage.setItem('aliph1_session_id', localSid);
     } catch {}
     setAttachedFile(null);
     setActivePanel('chat');
+    if (hasBackendId) return;
+    // Persist to backend asynchronously so history is never phantom (no await to keep UI instant).
+    void fetch('/api/agent/history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Discussion' }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const backendId = data?.session?.id;
+        if (backendId && backendId !== localSid) {
+          setCurrentSessionId(backendId);
+          try {
+            localStorage.setItem('aliph1_session_id', backendId);
+          } catch {}
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Auto-scroll chat to bottom on new message or state change
@@ -766,31 +786,34 @@ export default function AiTutorDrawer() {
     }
   }, [isOpen, connectLiveKit]);
 
-  // 12. Load Sessions for History Panel
+  // 12. Load Sessions for History Panel (merge backend + local cache by id, no divergence)
   const loadSessions = useCallback(async () => {
-    let list: ChatSession[] = [];
+    let backendList: ChatSession[] = [];
     try {
       const res = await fetch('/api/agent/history', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.sessions) && data.sessions.length > 0) {
-          list = data.sessions;
+        if (data.success && Array.isArray(data.sessions)) {
+          backendList = data.sessions;
         }
       }
     } catch {
-      // Fallback
+      // Fallback to cache
     }
 
-    if (list.length === 0) {
+    let localList: ChatSession[] = [];
+    try {
       const localSessJson = localStorage.getItem('aliph1_all_sessions');
-      if (localSessJson) {
-        try {
-          list = JSON.parse(localSessJson);
-        } catch {
-          list = [];
-        }
-      }
+      if (localSessJson) localList = JSON.parse(localSessJson);
+    } catch {
+      localList = [];
     }
+
+    // Merge by id: backend wins for metadata, local fills gaps when backend down.
+    const merged = new Map<string, ChatSession>();
+    for (const s of localList) if (s?.id) merged.set(s.id, s);
+    for (const s of backendList) if (s?.id) merged.set(s.id, s);
+    const list = Array.from(merged.values()).sort((a, b) => (b.updated_at || 0) - (a.updated_at || 0));
 
     setSessions(list);
   }, []);
@@ -940,9 +963,9 @@ export default function AiTutorDrawer() {
     } catch {}
   };
 
-  // 14b. Unified speech router (Ensures voice never jarringly changes across operations)
-  const speakWithLiveKitOrBrowser = (textToSpeak: string) => {
-    if (!isVoiceOutputEnabled) return;
+  // 14b. Unified speech router (single voice path; `force` for voice-initiated turns when output muted)
+  const speakWithLiveKitOrBrowser = (textToSpeak: string, force = false) => {
+    if (!isVoiceOutputEnabled && !force) return;
     const room = lkRoomRef.current;
     if (room && connectionStatus === 'connected') {
       try {
@@ -990,19 +1013,48 @@ export default function AiTutorDrawer() {
 
     // ── Check for direct Site Action intents from User ──
     const qLower = query.toLowerCase();
+    // Multi-action helper: extract "rename (it|session|chat) to/as X" even when combined with delete/new.
+    const extractRenameTitle = (raw: string): string | null => {
+      const m = raw.match(/renam\w*.*? (?:to|as)\s+["']?(.+?)["']?[.?!]*$/i);
+      if (!m) return null;
+      const cand = (m[1] || '').trim().replace(/^["']|["']$/g, '');
+      if (!cand || ['it', 'that', 'this', 'else', 'something else', 'session', 'chat'].includes(cand.toLowerCase())) return null;
+      return cand;
+    };
+    const combinedRename = extractRenameTitle(query);
 
-    // ── Direct Session History Clear & Delete Intents ──
+    // ── Direct Session History Clear & Delete Intents (multi-action: delete-all + rename) ──
     if (
       (qLower.includes('delete') || qLower.includes('clear') || qLower.includes('wipe') || qLower.includes('remove')) &&
       (qLower.includes('past session') ||
+        qLower.includes('previous session') ||
         qLower.includes('all session') ||
         qLower.includes('chat session') ||
         qLower.includes('history') ||
         qLower.includes('all chat') ||
-        qLower.includes('past chat'))
+        qLower.includes('past chat') ||
+        (qLower.includes('session') && !qLower.includes('this session') && !qLower.includes('current session')))
     ) {
       await handleClearAllHistory();
-      const reply = '🧹 All past conversation sessions have been permanently cleared. Starting a fresh session!';
+      let reply = '🧹 All past conversation sessions have been permanently cleared. Starting a fresh session!';
+      // If user also asked to rename/new in same sentence, execute sequentially (no intelligence loss).
+      if (combinedRename && currentSessionId) {
+        try {
+          await fetch(`/api/agent/history/${encodeURIComponent(currentSessionId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: combinedRename }),
+          });
+          // currentSessionId already rotated by handleClearAllHistory; rename the new active id.
+          const activeId = localStorage.getItem('aliph1_session_id') || currentSessionId;
+          await fetch(`/api/agent/history/${encodeURIComponent(activeId)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: combinedRename }),
+          });
+          reply = `🧹 All past sessions cleared, fresh chat started and renamed to '${combinedRename}'.`;
+        } catch {}
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -1013,7 +1065,7 @@ export default function AiTutorDrawer() {
           timestamp: Date.now(),
         },
       ]);
-      if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+      speakWithLiveKitOrBrowser(reply, wasVoice);
       setAgentState('idle');
       return;
     }
@@ -1032,7 +1084,7 @@ export default function AiTutorDrawer() {
             timestamp: Date.now(),
           },
         ]);
-        if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+        speakWithLiveKitOrBrowser(reply, wasVoice);
         setAgentState('idle');
         return;
       }
@@ -1066,7 +1118,7 @@ export default function AiTutorDrawer() {
           timestamp: Date.now(),
         },
       ]);
-      if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+      speakWithLiveKitOrBrowser(reply, wasVoice);
       setAgentState('idle');
       return;
     }
@@ -1103,7 +1155,7 @@ export default function AiTutorDrawer() {
             timestamp: Date.now(),
           },
         ]);
-        if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+        speakWithLiveKitOrBrowser(reply, wasVoice);
         setAgentState('idle');
         return;
       }
@@ -1127,7 +1179,7 @@ export default function AiTutorDrawer() {
             timestamp: Date.now(),
           },
         ]);
-        if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+        speakWithLiveKitOrBrowser(reply, wasVoice);
         setAgentState('idle');
         return;
       }
@@ -1148,7 +1200,7 @@ export default function AiTutorDrawer() {
           timestamp: Date.now(),
         },
       ]);
-      if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+      speakWithLiveKitOrBrowser(reply, wasVoice);
       setAgentState('idle');
       return;
     }
@@ -1171,7 +1223,7 @@ export default function AiTutorDrawer() {
             timestamp: Date.now(),
           },
         ]);
-        if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+        speakWithLiveKitOrBrowser(reply, wasVoice);
         setAgentState('idle');
         return;
       }
@@ -1198,7 +1250,7 @@ export default function AiTutorDrawer() {
               timestamp: Date.now(),
             },
           ]);
-          if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+          speakWithLiveKitOrBrowser(reply, wasVoice);
           setAgentState('idle');
           return;
         }
@@ -1221,7 +1273,7 @@ export default function AiTutorDrawer() {
           timestamp: Date.now(),
         },
       ]);
-      if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+      speakWithLiveKitOrBrowser(reply, wasVoice);
       setAgentState('idle');
       return;
     }
@@ -1242,7 +1294,7 @@ export default function AiTutorDrawer() {
           timestamp: Date.now(),
         },
       ]);
-      if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+      speakWithLiveKitOrBrowser(reply, wasVoice);
       setAgentState('idle');
       return;
     }
@@ -1291,7 +1343,7 @@ export default function AiTutorDrawer() {
               timestamp: Date.now(),
             },
           ]);
-          if (isVoiceOutputEnabled || wasVoice) speakText(spokenText);
+          speakWithLiveKitOrBrowser(spokenText || reply, wasVoice);
           setAgentState('idle');
           return;
         }
@@ -1336,7 +1388,7 @@ export default function AiTutorDrawer() {
             timestamp: Date.now(),
           },
         ]);
-        if (isVoiceOutputEnabled || wasVoice) speakText(reply);
+        speakWithLiveKitOrBrowser(reply, wasVoice);
         setAgentState('idle');
         return;
       }
@@ -1373,31 +1425,67 @@ export default function AiTutorDrawer() {
 
         if (chatRes.ok) {
           const chatData = await chatRes.json();
-          if (chatData.action) {
-            if (chatData.action === 'create_new_chat') {
-              handleNewChat(chatData.params?.session_id);
-            } else if (chatData.action === 'clear_chat_history') {
+          // Multi-action: execute every requested tool in sequence (e.g. clear + rename).
+          const actionList = Array.isArray(chatData.actions)
+            ? chatData.actions
+            : chatData.action
+              ? [{ action: chatData.action, params: chatData.params }]
+              : [];
+          for (const item of actionList) {
+            const actName = item?.action;
+            const actParams = item?.params || {};
+            if (!actName) continue;
+            if (actName === 'create_new_chat') {
+              handleNewChat(actParams?.session_id);
+            } else if (actName === 'clear_chat_history') {
               await handleClearAllHistory();
-            } else if (chatData.action === 'delete_chat_session') {
-              const sid = chatData.params?.session_id || currentSessionId;
+            } else if (actName === 'delete_chat_session') {
+              const sid = actParams?.session_id || currentSessionId;
               if (sid) {
                 await handleDeleteSession({ stopPropagation: () => {} } as any, sid);
               }
-            } else if (chatData.action === 'switch_orb_shader' && chatData.params?.variant_or_query) {
+            } else if (actName === 'rename_chat_session' && actParams?.new_title) {
+              const sid = actParams?.session_id || currentSessionId || localStorage.getItem('aliph1_session_id');
+              if (sid) {
+                try {
+                  await fetch(`/api/agent/history/${encodeURIComponent(sid)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: actParams.new_title }),
+                  });
+                } catch {}
+                setSessions((prev) => prev.map((s) => (s.id === sid ? { ...s, title: actParams.new_title } : s)));
+              }
+            } else if (actName === 'switch_orb_shader' && actParams?.variant_or_query) {
               const matched = ORB_VARIANT_LIST.find(
                 (v) =>
-                  v.key.toLowerCase() === chatData.params.variant_or_query.toLowerCase() ||
-                  v.label.toLowerCase().includes(chatData.params.variant_or_query.toLowerCase())
+                  v.key.toLowerCase() === String(actParams.variant_or_query).toLowerCase() ||
+                  v.label.toLowerCase().includes(String(actParams.variant_or_query).toLowerCase())
               );
               if (matched) handleShaderChange(matched.key);
-            } else if (chatData.action === 'change_avatar' && chatData.params?.avatar) {
-              setUserAvatar(chatData.params.avatar);
-              localStorage.setItem('aliph1_user_profile', JSON.stringify({ name: userName, avatar: chatData.params.avatar }));
-            } else if (chatData.action === 'change_name' && chatData.params?.name) {
-              setUserName(chatData.params.name);
-              localStorage.setItem('aliph1_user_profile', JSON.stringify({ name: chatData.params.name, avatar: userAvatar }));
+            } else if (actName === 'change_avatar' && actParams?.avatar) {
+              setUserAvatar(actParams.avatar);
+              localStorage.setItem('aliph1_user_profile', JSON.stringify({ name: userName, avatar: actParams.avatar }));
+            } else if (actName === 'change_name' && actParams?.name) {
+              setUserName(actParams.name);
+              localStorage.setItem('aliph1_user_profile', JSON.stringify({ name: actParams.name, avatar: userAvatar }));
             } else {
-              void executeSiteAction(chatData.action, chatData.params);
+              try {
+                const siteRes = await executeSiteAction(actName, actParams);
+                // Surface tool result inline so user sees real outcome, not a canned line.
+                if (!siteRes.success) {
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: generateMsgId(),
+                      role: 'assistant',
+                      speaker: 'aliph1',
+                      content: `⚠️ Tool \`${actName}\` failed: ${siteRes.message}`,
+                      timestamp: Date.now(),
+                    },
+                  ]);
+                }
+              } catch {}
             }
           }
 
@@ -1413,7 +1501,7 @@ export default function AiTutorDrawer() {
             },
           ]);
 
-          if (isVoiceOutputEnabled || wasVoice) speakWithLiveKitOrBrowser(replyContent);
+          speakWithLiveKitOrBrowser(replyContent, wasVoice);
           setAgentState('idle');
           return;
         }
@@ -1436,7 +1524,7 @@ export default function AiTutorDrawer() {
           timestamp: Date.now(),
         },
       ]);
-      if (isVoiceOutputEnabled || wasVoice) speakWithLiveKitOrBrowser(assistantText);
+      speakWithLiveKitOrBrowser(assistantText, wasVoice);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -1453,7 +1541,7 @@ export default function AiTutorDrawer() {
     }
   };
 
-  // 17. Quick Judge Code Action
+  // 17. Quick Judge Code Action (backend context first, localStorage fallback — never empty)
   const handleQuickJudgeCode = async () => {
     if (!currentQuestion || currentQuestion.type !== 'code' || isJudgingCode) return;
 
@@ -1461,7 +1549,21 @@ export default function AiTutorDrawer() {
     setAgentState('thinking');
 
     try {
-      const cachedCode = localStorage.getItem(`code_buffer_${currentQuestion.id}`) || '';
+      let cachedCode = '';
+      try {
+        const ctxRes = await fetch('/api/agent/context', { cache: 'no-store' });
+        if (ctxRes.ok) {
+          const ctxData = await ctxRes.json();
+          const backendCode = String(ctxData?.context?.code_buffer || '').trim();
+          const backendQid = String(ctxData?.context?.question?.id || '');
+          if (backendCode && (!backendQid || backendQid === currentQuestion.id)) {
+            cachedCode = backendCode;
+          }
+        }
+      } catch {}
+      if (!cachedCode) {
+        cachedCode = localStorage.getItem(`code_buffer_${currentQuestion.id}`) || '';
+      }
       const data = await judgeCodeSnippet(currentQuestion, cachedCode);
 
       setMessages((prev) => [
@@ -1494,7 +1596,9 @@ export default function AiTutorDrawer() {
     }
   };
 
-  // ── Universal Voice Recording Engine (Firefox, Chrome, Edge, Safari) ─────
+  // ── Universal Voice Recording Engine (single-mic: LiveKit xor local) ─────
+  // Priority: LiveKit pre-warmed track when connected (no second getUserMedia),
+  // else Web Speech interim + MediaRecorder fallback exclusively (never parallel).
   const startVoiceRecording = useCallback(async () => {
     if (isRecordingRef.current) return;
     isRecordingRef.current = true;
@@ -1503,7 +1607,8 @@ export default function AiTutorDrawer() {
 
     // (A) LiveKit Room integration if connected with pre-warmed track
     const room = lkRoomRef.current;
-    if (room && connectionStatus === 'connected' && micTrackRef.current) {
+    const livekitActive = Boolean(room && connectionStatus === 'connected' && micTrackRef.current);
+    if (livekitActive && room) {
       try {
         await micTrackRef.current.unmute();
         const data = JSON.stringify({ type: 'ptt_start' });
@@ -1518,6 +1623,7 @@ export default function AiTutorDrawer() {
     }
 
     // (B) Web Speech API streaming recognition if supported (Chrome, Edge)
+    // When LiveKit is active, Web Speech is interim-only (no extra mic stream).
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
@@ -1549,7 +1655,10 @@ export default function AiTutorDrawer() {
       }
     }
 
-    // (C) Universal MediaRecorder (Guarantees pristine audio capture across all browsers)
+    // (C) MediaRecorder fallback ONLY when LiveKit is NOT active and Web Speech is unavailable.
+    // Prevents triple-mic contention (LiveKit + Speech + Recorder) which broke STT.
+    const needsLocalRecorder = !livekitActive && !SpeechRecognition;
+    if (!needsLocalRecorder) return;
     try {
       if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
